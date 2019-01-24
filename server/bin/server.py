@@ -21,7 +21,6 @@ import sys
 import redis
 import tornado.ioloop
 from tornado.options import define, options
-from tornado.web import RequestHandler
 
 from huntflow_reloaded import handler
 
@@ -59,7 +58,7 @@ def main():
     ])
     application.listen(options.port)
 
-    LOGGER.info('server is listening on {}'.format(options.port))
+    LOGGER.info('server is listening on %s', options.port)
 
     try:
         tornado.ioloop.IOLoop.instance().start()

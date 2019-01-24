@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Module containing the Huntflow webhook handler. """
+
+
 import json
 import logging
 
@@ -37,7 +40,7 @@ class UnknownType(Exception):
     """
 
 
-class HuntflowWebhookHandler(RequestHandler):
+class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
     """Class implementing a Huntflow Webhook handler. """
 
     ADD_TYPE = 1
@@ -65,7 +68,7 @@ class HuntflowWebhookHandler(RequestHandler):
                 val = self._get_attr_or_stub('{}_handler'.format(i.lower()))
                 self._handlers[key] = val
 
-    def initialize(self, redis_conn, channel_name):
+    def initialize(self, redis_conn, channel_name):  # pylint: disable=arguments-differ
         self._channel_name = channel_name
         self._redis_conn = redis_conn
 
@@ -89,7 +92,7 @@ class HuntflowWebhookHandler(RequestHandler):
     def _process_request(self):
         pass
 
-    def post(self):
+    def post(self):  # pylint: disable=arguments-differ
         body = self.request.body.decode('utf8')
 
         try:
@@ -128,12 +131,16 @@ class HuntflowWebhookHandler(RequestHandler):
     #
 
     def add_type_handler(self):
+        """Invokes when a request of the 'ADD' type is received. """
         self._logger.info("Handling 'add' request")
 
     def removed_type_handler(self):
+        """Invokes when a request of the 'REMOVED' type is received. """
         self._logger.info("Handling 'removed' request")
 
     def status_type_handler(self):
+        """Invokes when a request of the 'STATUS' type is received. """
+
         self._logger.info("Handling 'status' request")
 
         event = self._decoded_body['event']
@@ -156,5 +163,8 @@ class HuntflowWebhookHandler(RequestHandler):
         self._redis_conn.publish(self._channel_name, json.dumps(message))
 
     def stub_handler(self):
+        """Invokes when a type is registered but there is no handler defined
+        which is responsible for dealing with the requests of the type.
+        """
         self._logger.info('Invoking the stub handler to serve the request of '
-                          'the type {}'.format(self._req_type))
+                          'the type %s', self._req_type)
