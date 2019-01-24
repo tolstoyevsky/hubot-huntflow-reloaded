@@ -10,7 +10,7 @@ module.exports = async (robot) => {
   const REDIS_HOST = process.env.REDIS_HOST || '127.0.0.1'
   const REDIS_PORT = parseInt(process.env.REDIS_PORT, 10) || 6379
 
-  const attempts_number = 15
+  const attemptsNumber = 15
   const redis = new Redis({
     host: REDIS_HOST,
     port: REDIS_PORT
@@ -18,7 +18,7 @@ module.exports = async (robot) => {
 
   let connected = false
 
-  for(let i = 0; i < attempts_number; i++){
+  for (let i = 0; i < attemptsNumber; i++) {
     if (redis.status === 'ready') {
       connected = true
       break
