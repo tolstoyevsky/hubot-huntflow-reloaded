@@ -1,0 +1,16 @@
+version: "2"
+services:
+  huntflow-reloaded-server:
+    image: huntflow-reloaded-server
+    network_mode: "host"
+    environment:
+    - LOGLEVEL=${LOGLEVEL}
+    - LOG_FILE=${LOG_FILE}
+    - REDIS_HOST=${REDIS_HOST}
+    - REDIS_PORT=${REDIS_PORT}
+  redis:
+    image: cusdeb/redis:5.0-amd64
+    network_mode: "host"
+    environment:
+    - REDIS_CONF_bind=127.0.0.1
+    - REDIS_CONF_port=16379
