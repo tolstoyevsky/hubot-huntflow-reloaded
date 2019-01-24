@@ -35,7 +35,27 @@ TODO: describe the server
 
 ### Installation
 
-TODO: describe how to install the server
+The simplest way to install and run the server is to use the Docker image.
+
+To run the server in the Docker container, go to the directory which contains the sources of the Docker image
+
+```
+$ cd server/docker
+```
+
+and run
+
+```
+$ docker-compose up
+```
+
+The command above will run both huntflow-reloaded-server and the Redis server. To run only huntflow-reloaded-server, run
+
+```
+$ docker-compose up huntflow-reloaded-server
+```
+
+To build the Docker image, run `make` from the same directory. In a while, the `huntflow-reloaded-server:latest` image will be created.
 
 ## Authors
 
