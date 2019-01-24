@@ -1,0 +1,23 @@
+language: python
+
+python:
+  - 3.6
+
+env:
+  - PYTHONPATH=$PYTHONPATH:$TRAVIS_BUILD_DIR/server
+
+addons:
+  apt:
+    sources:
+    - debian-sid
+
+install:
+  - pip install -r server/requirements.txt
+  - pip install pylint
+
+script:
+  # Disable duplicate-code since there are some problems related to it. One of
+  # the problems described here https://github.com/PyCQA/pylint/issues/2368.
+  - find -name "*.py" -not -path "./.git/*" ! -name "setup.py" ! -name "runtests.py" | xargs pylint --disable=R0801
+  - python3 -m tornado.testing server/test/runtests.py
+
