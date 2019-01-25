@@ -6,7 +6,8 @@ module.exports = async (robot) => {
   const Redis = require('ioredis')
   const routines = require('hubot-routines')
 
-  const CHANNEL_NAME = process.env.CHANNEL_NAME || 'hubot-huntflow-reloaded'
+  const HUNTFLOW_REMINDER_CHANNEL = process.env.HUNTFLOW_REMINDER_CHANNEL || 'hr'
+  const REDIS_CHANNEL = process.env.REDIS_CHANNEL || 'hubot-huntflow-reloaded'
   const REDIS_HOST = process.env.REDIS_HOST || '127.0.0.1'
   const REDIS_PORT = parseInt(process.env.REDIS_PORT, 10) || 16379
 
@@ -15,6 +16,11 @@ module.exports = async (robot) => {
     host: REDIS_HOST,
     port: REDIS_PORT
   })
+
+  if (!(await routines.isBotIsInRoom(robot, HUNTFLOW_REMINDER_CHANNEL))) {
+    routines.rave(robot, `Hubot is not in the group or channel named '${HUNTFLOW_REMINDER_CHANNEL}'`)
+    return
+  }
 
   let connected = false
 
@@ -33,14 +39,20 @@ module.exports = async (robot) => {
   }
 
   redis.on('message', (channel, message) => {
+    let json
+
     console.log(`Received the following message from ${channel}: ${message}`)
+
+    json = JSON.parse(message)
+
+    robot.messageRoom(HUNTFLOW_REMINDER_CHANNEL, `Кандидату ${json['first_name']} ${json['last_name']} назначено собеседование.`)
   })
 
-  redis.subscribe(CHANNEL_NAME, (error, count) => {
+  redis.subscribe(REDIS_CHANNEL, (error, count) => {
     if (error) {
       throw new Error(error)
     }
 
-    console.log(`Subscribed to ${count} channel. Listening for updates on the ${CHANNEL_NAME} channel.`)
+    console.log(`Subscribed to ${count} channel. Listening for updates on the ${REDIS_CHANNEL} channel.`)
   })
 }
