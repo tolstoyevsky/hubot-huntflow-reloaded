@@ -8,7 +8,7 @@ module.exports = async (robot) => {
 
   const CHANNEL_NAME = process.env.CHANNEL_NAME || 'hubot-huntflow-reloaded'
   const REDIS_HOST = process.env.REDIS_HOST || '127.0.0.1'
-  const REDIS_PORT = parseInt(process.env.REDIS_PORT, 10) || 6379
+  const REDIS_PORT = parseInt(process.env.REDIS_PORT, 10) || 16379
 
   const attemptsNumber = 15
   const redis = new Redis({
