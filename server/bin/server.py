@@ -33,6 +33,7 @@ define('channel-name',
        default='hubot-huntflow-reloaded')
 define('port', help='listen on a specific port', default=8888)
 define('redis-host', help='specify Redis host', default='localhost')
+define('redis-password', help='specify Redis password', default='')
 define('redis-port', help='specify Redis port', default=6379)
 
 
@@ -41,7 +42,9 @@ def main():
 
     options.parse_command_line()
 
-    conn = redis.StrictRedis(host=options.redis_host, port=options.redis_port)
+    conn = redis.StrictRedis(host=options.redis_host,
+                             password=options.redis_password,
+                             port=options.redis_port)
 
     try:
         conn.ping()

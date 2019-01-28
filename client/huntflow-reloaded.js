@@ -9,12 +9,14 @@ module.exports = async (robot) => {
   const HUNTFLOW_REMINDER_CHANNEL = process.env.HUNTFLOW_REMINDER_CHANNEL || 'hr'
   const REDIS_CHANNEL = process.env.REDIS_CHANNEL || 'hubot-huntflow-reloaded'
   const REDIS_HOST = process.env.REDIS_HOST || '127.0.0.1'
+  const REDIS_PASSWORD = process.env.REDIS_PASSWORD || null
   const REDIS_PORT = parseInt(process.env.REDIS_PORT, 10) || 16379
 
   const attemptsNumber = 15
   const redis = new Redis({
     host: REDIS_HOST,
-    port: REDIS_PORT
+    port: REDIS_PORT,
+    password: REDIS_PASSWORD
   })
 
   if (!(await routines.isBotInRoom(robot, HUNTFLOW_REMINDER_CHANNEL))) {

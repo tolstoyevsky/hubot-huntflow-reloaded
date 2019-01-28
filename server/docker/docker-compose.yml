@@ -7,6 +7,7 @@ services:
     - LOGLEVEL=${LOGLEVEL}
     - LOG_FILE=${LOG_FILE}
     - REDIS_HOST=${REDIS_HOST}
+    - REDIS_PASSWORD=${REDIS_PASSWORD}
     - REDIS_PORT=${REDIS_PORT}
   redis:
     image: cusdeb/redis:5.0-amd64

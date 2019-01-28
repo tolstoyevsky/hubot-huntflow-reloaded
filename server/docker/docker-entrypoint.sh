@@ -21,6 +21,8 @@ LOG_FILE=${LOG_FILE:="/var/log/huntflow-reloaded-server.log"}
 
 REDIS_HOST=${REDIS_HOST:="127.0.0.1"}
 
+REDIS_PASSWORD=${REDIS_PASSWORD:=""}
+
 REDIS_PORT=${REDIS_PORT:="16379"}
 
 set +x
@@ -34,6 +36,8 @@ args=()
 args+=( --logging="${LOGLEVEL}" )
 
 args+=( --redis-host="${REDIS_HOST}" )
+
+args+=( --redis-password="${REDIS_PASSWORD}" )
 
 args+=( --redis-port="${REDIS_PORT}" )
 
