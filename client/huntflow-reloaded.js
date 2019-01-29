@@ -17,7 +17,7 @@ module.exports = async (robot) => {
     port: REDIS_PORT
   })
 
-  if (!(await routines.isBotIsInRoom(robot, HUNTFLOW_REMINDER_CHANNEL))) {
+  if (!(await routines.isBotInRoom(robot, HUNTFLOW_REMINDER_CHANNEL))) {
     routines.rave(robot, `Hubot is not in the group or channel named '${HUNTFLOW_REMINDER_CHANNEL}'`)
     return
   }
