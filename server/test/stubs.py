@@ -44,6 +44,21 @@ INCOMPLETE_INTERVIEW_REQUEST = """{
 }
 """
 
+MISSING_CALENDAR_INTERVIEW_REQUEST = """
+    %ACCOUNT%,
+    "event": {
+        "created": "%CREATED_DATE%",
+        "type": "STATUS",
+        "applicant": {
+            "id": 1,
+            "first_name": "Matt",
+            "last_name": "Groening"
+        },
+        "calendar_event": None
+    }
+}
+"""
+
 INTERVIEW_REQUEST = """{
     %ACCOUNT%,
     "event": {

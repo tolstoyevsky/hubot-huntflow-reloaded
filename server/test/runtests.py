@@ -112,3 +112,10 @@ class HuntflowWebhookHandlerTest(WebTestCase):
                               method='POST')
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body, b'')
+
+    def test_missing_calendar_event_item(self):
+        response = self.fetch('/hf',
+                              body=compose(stubs.MISSING_CALENDAR_INTERVIEW_REQUEST),
+                              method='POST')
+        self.assertEqual(response.code, 500)
+        self.assertEqual(response.body, b'Could not decode request body. There must be valid JSON')

@@ -162,6 +162,9 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         self._logger.info("Handling 'status' request")
 
         event = self._decoded_body['event']
+        if not event.get('calendar_event'):
+            raise IncompleteRequest
+
         try:
             _id = event['applicant']['id']
             first_name = event['applicant']['first_name']
