@@ -16,7 +16,10 @@ module.exports = async (robot) => {
   const redis = new Redis({
     host: REDIS_HOST,
     port: REDIS_PORT,
-    password: REDIS_PASSWORD
+    password: REDIS_PASSWORD,
+    retryStrategy (times) {
+      return times < attemptsNumber ? Math.min(times * 100, 2000) : false
+    }
   })
 
   if (!(await routines.isBotInRoom(robot, HUNTFLOW_REMINDER_CHANNEL))) {
@@ -24,26 +27,25 @@ module.exports = async (robot) => {
     return
   }
 
-  let connected = false
+  redis.on('end', () => robot.logger.info('Redis connection is closed'))
 
-  for (let i = 0; i < attemptsNumber; i++) {
-    if (redis.status === 'ready') {
-      connected = true
-      break
+  redis.on('reconnecting', time => robot.logger.info(`Could not connect to Redis. Retying after ${time}ms...`))
+
+  redis.on('error', (err) => {
+    // There is no need to print here some of the error codes.
+    switch (err.errno) {
+      case 'ECONNREFUSED':
+        break
+      default:
+        routines.rave(robot, `Redis error:\n${err.message}`)
+        break
     }
-
-    await routines.delay(1000)
-  }
-
-  if (!connected) {
-    routines.rave(robot, `Could not connect to Redis`)
-    return
-  }
+  })
 
   redis.on('message', (channel, message) => {
     let json
 
-    console.log(`Received the following message from ${channel}: ${message}`)
+    robot.logger.info(`Received the following message from ${channel}: ${message}`)
 
     json = JSON.parse(message)
 
@@ -52,9 +54,9 @@ module.exports = async (robot) => {
 
   redis.subscribe(REDIS_CHANNEL, (error, count) => {
     if (error) {
-      throw new Error(error)
+      return redis.disconnect()
     }
 
-    console.log(`Subscribed to ${count} channel. Listening for updates on the ${REDIS_CHANNEL} channel.`)
+    robot.logger.info(`Subscribed to ${count} channel. Listening for updates on the ${REDIS_CHANNEL} channel.`)
   })
 }
