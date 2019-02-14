@@ -1,6 +1,11 @@
 """ Database GINO models """
 
-from gino.ext.tornado import Gino
+import sys
+
+if sys.argv[0].split('/')[-1] == 'testing.py':
+    from test.mock_gino import Gino
+else:
+    from gino.ext.tornado import Gino
 
 DB = Gino()
 
@@ -16,10 +21,10 @@ class Candidate(DB.Model):
 
     __table_args__ = (DB.UniqueConstraint('id'))  # pylint: disable=maybe-no-member
 
-class Inerview(DB.Model):
+class Interview(DB.Model):
     """ Interview event model """
 
-    __tablename__ = 'inerviews'
+    __tablename__ = 'interviews'
 
     id = DB.Column(DB.Integer(), primary_key=True, autoincrement=True)  # pylint: disable=maybe-no-member
 

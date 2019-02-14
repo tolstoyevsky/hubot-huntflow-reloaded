@@ -17,6 +17,8 @@
 
 import json
 import logging
+import re
+from datetime import datetime
 
 from tornado.escape import json_decode
 from tornado.web import RequestHandler
@@ -89,8 +91,12 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
     async def _connect_to_database(self):
         """ Connecting to ORM if not connected already """
         if not HuntflowWebhookHandler.GINO_CONNECTED:
-            await models.gino_run(**self._postgres_data)
-            HuntflowWebhookHandler.GINO_CONNECTED = True
+            try:
+                await models.gino_run(**self._postgres_data)
+            except:
+                raise ConnectionError('Could not connect to Postgresql')
+            else:
+                HuntflowWebhookHandler.GINO_CONNECTED = True
 
     def _get_attr_or_stub(self, attribute_name):
         try:
@@ -130,7 +136,7 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         self._logger.debug(self._decoded_body)
 
         try:
-            self._handlers[self._req_type]()
+            await self._handlers[self._req_type]()
         except IncompleteRequest:
             self._logger.debug(body)
             self.write('Incomplete request')
@@ -141,15 +147,15 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
     # Handlers
     #
 
-    def add_type_handler(self):
+    async def add_type_handler(self):
         """Invokes when a request of the 'ADD' type is received. """
         self._logger.info("Handling 'add' request")
 
-    def removed_type_handler(self):
+    async def removed_type_handler(self):
         """Invokes when a request of the 'REMOVED' type is received. """
         self._logger.info("Handling 'removed' request")
 
-    def status_type_handler(self):
+    async def status_type_handler(self):  # pylint: disable=too-many-locals
         """Invokes when a request of the 'STATUS' type is received. """
 
         self._logger.info("Handling 'status' request")
@@ -171,9 +177,47 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
             'start': start,
         }
 
+        candidate = await models.Candidate.query.where(models.Candidate.id == _id).gino.all()
+
+        if not candidate:
+            options = {
+                "id": _id,
+                "first_name": first_name,
+                "last_name": last_name
+            }
+            await models.Candidate.create(**options)
+
+        calendar_event = await models.Interview.query \
+            .where(models.Interview.candidate == _id) \
+            .where(models.Interview.type == event.get('type')) \
+            .gino.all()
+
+        if not calendar_event:
+            format_string = '%Y-%m-%dT%H:%M:%S%z'
+            regexp = r"(\+\d{1,2})(:)(\d{1,2})"
+
+            interview_start = datetime \
+                .strptime(re.sub(regexp, r"\1\3", start), format_string) \
+                .replace(tzinfo=None)
+            interview_end = datetime \
+                .strptime(re.sub(regexp, r"\1\3", _end), format_string) \
+                .replace(tzinfo=None)
+
+            today = datetime.now()
+
+            options = {
+                "created": today,
+                "type": event.get('type'),
+                "candidate": _id,
+                "start": interview_start,
+                "end": interview_end
+            }
+
+            await models.Interview.create(**options)
+
         self._redis_conn.publish(self._channel_name, json.dumps(message))
 
-    def stub_handler(self):
+    async def stub_handler(self):
         """Invokes when a type is registered but there is no handler defined
         which is responsible for dealing with the requests of the type.
         """
