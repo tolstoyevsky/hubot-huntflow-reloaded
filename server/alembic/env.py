@@ -1,7 +1,5 @@
 """ Alembic environment variables """
 
-# pylint: disable=maybe-no-member,no-name-in-module,invalid-name,import-error
-
 from __future__ import with_statement
 import os
 
@@ -10,11 +8,11 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-from huntflow_reloaded.models import DB as target_metadata
+from huntflow_reloaded.models import DB as target_metadata  # pylint: disable=import-error
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
-config = context.config
+config = context.config  # pylint: disable=maybe-no-member,invalid-name
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -49,11 +47,11 @@ def run_migrations_offline():
 
     """
     url = get_database_url()
-    context.configure(
+    context.configure(  # pylint: disable=maybe-no-member
         url=url, target_metadata=target_metadata, literal_binds=True)
 
-    with context.begin_transaction():
-        context.run_migrations()
+    with context.begin_transaction():  # pylint: disable=maybe-no-member
+        context.run_migrations()  # pylint: disable=maybe-no-member
 
 
 def run_migrations_online():
@@ -73,15 +71,15 @@ def run_migrations_online():
         poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
-        context.configure(
+        context.configure(  # pylint: disable=maybe-no-member
             connection=connection,
             target_metadata=target_metadata
         )
 
-        with context.begin_transaction():
-            context.run_migrations()
+        with context.begin_transaction():  # pylint: disable=maybe-no-member
+            context.run_migrations()  # pylint: disable=maybe-no-member
 
-if context.is_offline_mode():
+if context.is_offline_mode():  # pylint: disable=maybe-no-member
     run_migrations_offline()
 else:
     run_migrations_online()
