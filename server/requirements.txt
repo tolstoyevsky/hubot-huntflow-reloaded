@@ -1,3 +1,4 @@
+aiologger==0.3.0
 alembic==1.0.7
 APScheduler==3.5.3
 fakeredis==0.16.*

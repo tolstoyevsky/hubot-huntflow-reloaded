@@ -22,6 +22,7 @@ import redis
 import tornado.ioloop
 from tornado.options import define, options
 from dotenv import load_dotenv
+from aiologger import Logger as async_logger
 
 from huntflow_reloaded.scheduler import Scheduler
 from huntflow_reloaded import handler
@@ -75,9 +76,19 @@ def main():
         'redis_args': {
             'host': options.redis_host,
             'password': options.redis_password,
-            'port': options.redis_port
+            'port': options.redis_port,
+        }
+    }
+    args = {
+        'logger' : async_logger.with_default_handlers(name='tornado.application'),
+        'postgres': {
+            'dbname': options.postgres_dbname,
+            'hostname': options.postgres_host,
+            'password': options.postgres_pass,
+            'port': options.postgres_port,
+            'username': options.postgres_user,
+            'channel_name': options.channel_name,
         },
-        'channel_name': options.channel_name,
     }
 
     scheduler = Scheduler(**scheduler_args)

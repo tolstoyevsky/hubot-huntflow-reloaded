@@ -16,7 +16,6 @@
 
 
 import json
-import logging
 import re
 from datetime import datetime
 
@@ -82,7 +81,7 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
                                                      **kwargs)
         self._decoded_body = {}
         self._handlers = {}
-        self._logger = logging.getLogger('tornado.application')
+        self._redis_conn = self._redis_conn or None
         self._req_type = None
         self.basic_attrs = {}
         self.event = {}
@@ -96,6 +95,11 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
                 val = self._get_attr_or_stub('{}_handler'.format(i.lower()))
                 self._handlers[key] = val
 
+    def initialize(self, redis_conn, channel_name, postgres, logger):  # pylint: disable=arguments-differ
+        self._channel_name = channel_name
+        self._redis_conn = redis_conn
+        self._postgres_data = postgres
+        self._logger = logger
 
     def _classify_request(self):
         try:
@@ -143,27 +147,27 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
         try:
             self._classify_request()
         except UndefinedType:
-            self._logger.debug(body)
+            await self._logger.debug(body)
             self.write('Undefined type')
             self.set_status(500)
             return
         except UnknownType:
-            self._logger.debug(body)
+            await self._logger.debug(body)
             self.write('Unknown type')
             self.set_status(500)
             return
 
-        self._logger.debug(self._decoded_body)
+        await self._logger.debug(self._decoded_body)
 
         try:
             await self._handlers[self._req_type]()
         except IncompleteRequest:
-            self._logger.debug(body)
+            await self._logger.debug(body)
             self.write('Incomplete request')
             self.set_status(500)
             return
 
-        self._logger.debug(body)
+        await self._logger.debug(body)
 
     #
     # Handlers
@@ -171,11 +175,11 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
 
     async def add_type_handler(self):
         """Invokes when a request of the 'ADD' type is received. """
-        self._logger.info("Handling 'add' request")
+        await self._logger.info("Handling 'add' request")
 
     async def removed_type_handler(self):
         """Invokes when a request of the 'REMOVED' type is received. """
-        self._logger.info("Handling 'removed' request")
+        await self._logger.info("Handling 'removed' request")
 
     async def status_type_handler(self):
         """Invokes when a request of the 'STATUS' type is received:
@@ -184,7 +188,7 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
         * setting the first working day.
         """
 
-        self._logger.info("Handling 'status' request")
+        await self._logger.info("Handling 'status' request")
 
         self.event = self._decoded_body['event']
 
