@@ -3,6 +3,7 @@
 //
 
 module.exports = async (robot) => {
+  const moment = require('moment')
   const Redis = require('ioredis')
   const routines = require('hubot-routines')
 
@@ -49,7 +50,33 @@ module.exports = async (robot) => {
 
     json = JSON.parse(message)
 
-    robot.messageRoom(HUNTFLOW_REMINDER_CHANNEL, `Кандидату ${json['first_name']} ${json['last_name']} назначено собеседование.`)
+    const when = (json) => {
+      const start = moment(json.start)
+      const date = start.format('DD.MM')
+      const time = start.format('HH:mm')
+      const today = moment().startOf('day')
+
+      if (moment(json.start).isBefore(moment())) {
+        return `${date} в ${time} было`
+      }
+
+      switch (start.startOf('day').diff(today, 'days')) {
+        case 0:
+          if (moment(json.start).diff(moment(), 'minutes') <= 60) {
+            return 'через час'
+          } else {
+            return `сегодня в ${time}`
+          }
+        case 1:
+          return `завтра в ${time}`
+        default:
+          return `${date} в ${time}`
+      }
+    }
+
+    const output = `У ${json['first_name']} ${json['last_name']} ${when(json)} собеседование.`
+
+    robot.messageRoom(HUNTFLOW_REMINDER_CHANNEL, output)
   })
 
   redis.subscribe(REDIS_CHANNEL, (error, count) => {

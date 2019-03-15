@@ -23,6 +23,7 @@ from datetime import datetime
 from tornado.escape import json_decode
 from tornado.web import RequestHandler
 
+import huntflow_reloaded.scheduler
 from huntflow_reloaded import models
 
 class IncompleteRequest(Exception):
@@ -214,6 +215,8 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
             }
 
             await models.Interview.create(**options)
+
+        huntflow_reloaded.scheduler.create_event(self, message)
 
         self._redis_conn.publish(self._channel_name, json.dumps(message))
 
