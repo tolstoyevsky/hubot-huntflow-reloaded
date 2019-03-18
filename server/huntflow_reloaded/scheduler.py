@@ -6,6 +6,8 @@ from datetime import timedelta, datetime
 
 from apscheduler.schedulers.tornado import TornadoScheduler
 
+from huntflow_reloaded.models import Interview, Candidate
+
 _SCHEDULER = TornadoScheduler()
 
 def add(date, func, args=(), kwargs={}):  # pylint: disable=dangerous-default-value
@@ -18,21 +20,25 @@ def add(date, func, args=(), kwargs={}):  # pylint: disable=dangerous-default-va
         kwargs=kwargs
     )
 
-def create_event(ctx, message):
+def create_event(channel_name, redis_conn, message):
     """
     Schedules the events:
     * remind an hour in advance;
     * remind in the morning of the event day;
     * remind in the evening of the event day.
     """
-    time_string = re.sub(r"(\+\d{1,2})(:)(\d{1,2})", r"\1\3", message['start'])
-    date = datetime \
-        .strptime(time_string, '%Y-%m-%dT%H:%M:%S%z') \
-        .replace(tzinfo=None)
+    if isinstance(message['start'], datetime):
+        date = message['start']
+    else:
+        time_string = re.sub(r"(\+\d{1,2})(:)(\d{1,2})", r"\1\3", message['start'])
+        date = datetime \
+            .strptime(time_string, '%Y-%m-%dT%H:%M:%S%z') \
+            .replace(tzinfo=None)
 
     args = (message,)
     kwargs = {
-        'ctx': ctx
+        'channel_name': channel_name,
+        'redis_conn': redis_conn
     }
 
     an_hour_before = date - timedelta(hours=1)
@@ -49,10 +55,29 @@ def create_event(ctx, message):
     )
     add(evening_of_yesterday, notify_interview, args=args, kwargs=kwargs)
 
-def make():
-    """ Runs the scheduler workers. """
+async def make(channel_name, redis_conn):
+    """ Run scheduler workers """
+    now = datetime.now()
+    query = await Interview.query.gino.all()
+
+    for interview in query:
+        if interview.start >= now:
+            # pylint: disable=maybe-no-member
+            candidate = await Candidate \
+                .query.where(Candidate.id == interview.candidate) \
+                .gino.first()
+
+            message = {
+                'type': 'interview',
+                'first_name': candidate.first_name,
+                'last_name': candidate.last_name,
+                'start': interview.start
+            }
+
+            create_event(channel_name, redis_conn, message)
+
     _SCHEDULER.start()
 
-def notify_interview(message, ctx=None):
-    """ Invoked when the event comes. """
-    ctx._redis_conn.publish(ctx._channel_name, json.dumps(message))  # pylint: disable=W0212
+def notify_interview(message, channel_name=None, redis_conn=None):
+    """ Function that will be called for notify about interview """
+    redis_conn.publish(channel_name, json.dumps(message))  # pylint: disable=W0212

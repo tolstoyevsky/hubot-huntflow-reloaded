@@ -23,7 +23,7 @@ import tornado.ioloop
 from tornado.options import define, options
 
 import huntflow_reloaded.scheduler
-from huntflow_reloaded import handler
+from huntflow_reloaded import handler, models
 
 LOGGER = logging.getLogger('tornado.application')
 
@@ -60,13 +60,6 @@ def main():
         sys.exit(1)
 
     args = {
-        'postgres': {
-            'dbname': options.postgres_dbname,
-            'hostname': options.postgres_host,
-            'password': options.postgres_pass,
-            'port': options.postgres_port,
-            'username': options.postgres_user,
-        },
         'redis_conn': conn,
         'channel_name': options.channel_name,
     }
@@ -77,7 +70,21 @@ def main():
 
     LOGGER.info('server is listening on %s', options.port)
 
-    huntflow_reloaded.scheduler.make()
+    ioloop = tornado.ioloop.IOLoop.instance()
+    postgres_connection_data = {
+        'dbname': options.postgres_dbname,
+        'hostname': options.postgres_host,
+        'password': options.postgres_pass,
+        'port': options.postgres_port,
+        'username': options.postgres_user
+    }
+    ioloop.run_sync(
+        lambda: models.gino_run(**postgres_connection_data)
+    )
+
+    ioloop.run_sync(
+        lambda: huntflow_reloaded.scheduler.make(conn, options.channel_name),
+    )
 
     try:
         tornado.ioloop.IOLoop.instance().start()

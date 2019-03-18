@@ -24,7 +24,7 @@ from tornado.escape import json_decode
 from tornado.web import RequestHandler
 
 import huntflow_reloaded.scheduler
-from huntflow_reloaded import models
+from huntflow_reloaded.models import Candidate, Interview
 
 class IncompleteRequest(Exception):
     """Exception raised when receiving a request of a specific type but not
@@ -55,7 +55,6 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         'REMOVED': REMOVED_TYPE,
         'STATUS': STATUS_TYPE,
     }
-    GINO_CONNECTED = False
 
     def __init__(self, application, request, **kwargs):
         super(HuntflowWebhookHandler, self).__init__(application, request,
@@ -73,10 +72,9 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
                 val = self._get_attr_or_stub('{}_handler'.format(i.lower()))
                 self._handlers[key] = val
 
-    def initialize(self, redis_conn, channel_name, postgres):  # pylint: disable=arguments-differ
+    def initialize(self, redis_conn, channel_name):  # pylint: disable=arguments-differ
         self._channel_name = channel_name
         self._redis_conn = redis_conn
-        self._postgres_data = postgres
 
     def _classify_request(self):
         try:
@@ -89,16 +87,6 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         except KeyError:
             raise UnknownType
 
-    async def _connect_to_database(self):
-        """ Connecting to ORM if not connected already """
-        if not HuntflowWebhookHandler.GINO_CONNECTED:
-            try:
-                await models.gino_run(**self._postgres_data)
-            except:
-                raise ConnectionError('Could not connect to Postgresql')
-            else:
-                HuntflowWebhookHandler.GINO_CONNECTED = True
-
     def _get_attr_or_stub(self, attribute_name):
         try:
             return getattr(self, attribute_name)
@@ -110,8 +98,6 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
 
     async def post(self):  # pylint: disable=arguments-differ
         body = self.request.body.decode('utf8')
-
-        await self._connect_to_database()
 
         try:
             self._decoded_body = json_decode(body)
@@ -178,7 +164,7 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
             'start': start,
         }
 
-        candidate = await models.Candidate.query.where(models.Candidate.id == _id).gino.all()
+        candidate = await Candidate.query.where(Candidate.id == _id).gino.all()
 
         if not candidate:
             options = {
@@ -186,11 +172,11 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
                 "first_name": first_name,
                 "last_name": last_name
             }
-            await models.Candidate.create(**options)
+            await Candidate.create(**options)
 
-        calendar_event = await models.Interview.query \
-            .where(models.Interview.candidate == _id) \
-            .where(models.Interview.type == event.get('type')) \
+        calendar_event = await Interview.query \
+            .where(Interview.candidate == _id) \
+            .where(Interview.type == event.get('type')) \
             .gino.all()
 
         if not calendar_event:
@@ -214,9 +200,13 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
                 "end": interview_end
             }
 
-            await models.Interview.create(**options)
+            await Interview.create(**options)
 
-        huntflow_reloaded.scheduler.create_event(self, message)
+        huntflow_reloaded.scheduler.create_event(
+            self._channel_name,
+            self._redis_conn,
+            message
+        )
 
         self._redis_conn.publish(self._channel_name, json.dumps(message))
 

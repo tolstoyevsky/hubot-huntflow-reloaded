@@ -65,13 +65,6 @@ class HuntflowWebhookHandlerTest(WebTestCase):
     def get_handlers(self):
         conn = fakeredis.FakeStrictRedis()
         args = {
-            'postgres': {
-                'dbname': 'test',
-                'hostname': 'localhost',
-                'password': '',
-                'port': '5432',
-                'username': 'postgres',
-            },
             'redis_conn': conn,
             'channel_name': 'stub',
         }
