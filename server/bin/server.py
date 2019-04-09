@@ -66,19 +66,29 @@ def main():
         port=options.postgres_port,
         dbname=options.postgres_dbname
     )
-    args = {
+
+    scheduler_args = {
+        'postgres_url': postgres_url,
+        'redis_args': {
+            'host': options.redis_host,
+            'password': options.redis_password,
+            'port': options.redis_port
+        },
+        'channel_name': options.channel_name,
+    }
+
+    scheduler = Scheduler(**scheduler_args)
+    scheduler.make()
+
+    app_args = {
+        'scheduler' : scheduler,
         'postgres_url': postgres_url,
         'redis_conn': conn,
         'channel_name': options.channel_name,
     }
 
-    scheduler = Scheduler(**args)
-    scheduler.make()
-
-    args['scheduler'] = scheduler
-
     application = tornado.web.Application([
-        (r'/hf/?', handler.HuntflowWebhookHandler, args),
+        (r'/hf/?', handler.HuntflowWebhookHandler, app_args),
     ])
     application.listen(options.port)
 
