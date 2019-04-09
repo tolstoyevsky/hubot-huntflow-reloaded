@@ -6,53 +6,58 @@ from datetime import timedelta, datetime
 
 from apscheduler.schedulers.tornado import TornadoScheduler
 
-_SCHEDULER = TornadoScheduler()
+class Scheduler:
+    """Class encapsulating scheduling logic. """
 
-def add(date, func, args=(), kwargs={}):  # pylint: disable=dangerous-default-value
-    """ Shortcut for adding new events. """
-    _SCHEDULER.add_job(
-        func,
-        'date',
-        run_date=date,
-        args=args,
-        kwargs=kwargs
-    )
+    def __init__(self, redis_conn, channel_name):
+        self.redis_conn = redis_conn
+        self.scheduler = TornadoScheduler()
+        self.channel_name = channel_name
 
-def create_event(ctx, message):
-    """
-    Schedules the events:
-    * remind an hour in advance;
-    * remind in the morning of the event day;
-    * remind in the evening of the event day.
-    """
-    time_string = re.sub(r"(\+\d{1,2})(:)(\d{1,2})", r"\1\3", message['start'])
-    date = datetime \
-        .strptime(time_string, '%Y-%m-%dT%H:%M:%S%z') \
-        .replace(tzinfo=None)
+    def add(self, date, func, msg):
+        """Shortcut for adding new events. """
 
-    args = (message,)
-    kwargs = {
-        'ctx': ctx
-    }
+        self.scheduler.add_job(
+            func=func,
+            trigger='date',
+            next_run_time=date,
+            args=msg
+        )
 
-    an_hour_before = date - timedelta(hours=1)
-    add(an_hour_before, notify_interview, args=args, kwargs=kwargs)
+    def create_event(self, message):
+        """Schedules the events:
+        * remind an hour in advance;
+        * remind in the morning of the event day;
+        * remind in the evening before the event day.
+        """
 
-    morning_same_day = date.replace(hour=7, minute=0, second=0)
-    add(morning_same_day, notify_interview, args=args, kwargs=kwargs)
+        time_string = re.sub(r"(\+\d{1,2})(:)(\d{1,2})", r"\1\3", message['start'])
+        date = datetime \
+            .strptime(time_string, '%Y-%m-%dT%H:%M:%S%z') \
+            .replace()
 
-    evening_of_yesterday = date.replace(
-        day=date.day - 1,
-        hour=18,
-        minute=0,
-        second=0
-    )
-    add(evening_of_yesterday, notify_interview, args=args, kwargs=kwargs)
+        msg = (message,)
 
-def make():
-    """ Runs the scheduler workers. """
-    _SCHEDULER.start()
+        an_hour_in_advance = date - timedelta(hours=1)
+        self.add(date=an_hour_in_advance, func=self.notify_interview, msg=msg)
 
-def notify_interview(message, ctx=None):
-    """ Invoked when the event comes. """
-    ctx._redis_conn.publish(ctx._channel_name, json.dumps(message))  # pylint: disable=W0212
+        morning_of_event_day = date.replace(hour=7, minute=0, second=0)
+        self.add(date=morning_of_event_day, func=self.notify_interview, msg=msg)
+
+        evening_before_event_day = date.replace(
+            day=date.day - 1,
+            hour=18,
+            minute=0,
+            second=0
+        )
+        self.add(date=evening_before_event_day, func=self.notify_interview, msg=msg)
+
+    def make(self):
+        """Runs the scheduler workers. """
+
+        self.scheduler.start()
+
+    def notify_interview(self, message):
+        """Invoked when the event comes. """
+
+        self.redis_conn.publish(self.channel_name, json.dumps(message))

@@ -33,9 +33,7 @@ class Interview(DB.Model):
 
     __table_args__ = (DB.UniqueConstraint('id'))  # pylint: disable=maybe-no-member
 
-async def gino_run(**kwargs):
+async def gino_run(postgres_url):
     """ Set up connection to the database """
 
-    postgres_url = 'postgresql://{username}:{password}@{hostname}:{port}/{dbname}'
-
-    await DB.set_bind(postgres_url.format(**kwargs))
+    await DB.set_bind(postgres_url)

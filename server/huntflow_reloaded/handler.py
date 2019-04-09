@@ -23,7 +23,6 @@ from datetime import datetime
 from tornado.escape import json_decode
 from tornado.web import RequestHandler
 
-import huntflow_reloaded.scheduler
 from huntflow_reloaded import models
 
 class IncompleteRequest(Exception):
@@ -73,10 +72,11 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
                 val = self._get_attr_or_stub('{}_handler'.format(i.lower()))
                 self._handlers[key] = val
 
-    def initialize(self, redis_conn, channel_name, postgres):  # pylint: disable=arguments-differ
+    def initialize(self, redis_conn, channel_name, postgres_url, scheduler):  # pylint: disable=arguments-differ
         self._channel_name = channel_name
         self._redis_conn = redis_conn
-        self._postgres_data = postgres
+        self._postgres_url = postgres_url
+        self._scheduler = scheduler
 
     def _classify_request(self):
         try:
@@ -93,7 +93,7 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         """ Connecting to ORM if not connected already """
         if not HuntflowWebhookHandler.GINO_CONNECTED:
             try:
-                await models.gino_run(**self._postgres_data)
+                await models.gino_run(self._postgres_url)
             except:
                 raise ConnectionError('Could not connect to Postgresql')
             else:
@@ -215,7 +215,7 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
 
             await models.Interview.create(**options)
 
-        huntflow_reloaded.scheduler.create_event(self, message)
+        self._scheduler.create_event(message)
 
         self._redis_conn.publish(self._channel_name, json.dumps(message))
 
