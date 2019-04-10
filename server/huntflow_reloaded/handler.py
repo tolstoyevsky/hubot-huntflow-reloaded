@@ -59,11 +59,9 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
     def __init__(self, application, request, **kwargs):
         super(HuntflowWebhookHandler, self).__init__(application, request,
                                                      **kwargs)
-        self._channel_name = self._channel_name or None
         self._decoded_body = {}
         self._handlers = {}
         self._logger = logging.getLogger('tornado.application')
-        self._redis_conn = self._redis_conn or None
         self._req_type = None
 
         for i in dir(self):
@@ -72,9 +70,7 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
                 val = self._get_attr_or_stub('{}_handler'.format(i.lower()))
                 self._handlers[key] = val
 
-    def initialize(self, redis_conn, channel_name, postgres_url, scheduler):  # pylint: disable=arguments-differ
-        self._channel_name = channel_name
-        self._redis_conn = redis_conn
+    def initialize(self, postgres_url, scheduler):  # pylint: disable=arguments-differ
         self._postgres_url = postgres_url
         self._scheduler = scheduler
 
@@ -217,7 +213,7 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
 
         self._scheduler.create_event(message)
 
-        self._redis_conn.publish(self._channel_name, json.dumps(message))
+        self._scheduler.publish_now(message)
 
     async def stub_handler(self):
         """Invokes when a type is registered but there is no handler defined

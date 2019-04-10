@@ -83,8 +83,6 @@ def main():
     app_args = {
         'scheduler' : scheduler,
         'postgres_url': postgres_url,
-        'redis_conn': conn,
-        'channel_name': options.channel_name,
     }
 
     application = tornado.web.Application([

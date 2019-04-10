@@ -70,3 +70,8 @@ class Scheduler:
 
         conn = redis.StrictRedis(**redis_conn_args)
         conn.publish(channel_name, json.dumps(message))
+
+    def publish_now(self, message):
+        """Publishes message in Redis channel immediately. """
+
+        self.notify_interview(message, self.redis_args, self.channel_name)
