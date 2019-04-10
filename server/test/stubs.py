@@ -70,7 +70,7 @@ INTERVIEW_REQUEST = """{
             "last_name": "Groening"
         },
         "calendar_event": {
-            "start": "1989-12-17T00:00:00+03:00",
+            "start": "%START_DATE%",
             "end": "1989-12-17T01:00:00+03:00"
         }
     }

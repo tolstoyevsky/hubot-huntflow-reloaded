@@ -4,7 +4,8 @@ import re
 import json
 from datetime import timedelta, datetime
 
-import redis
+from fakeredis import FakeStrictRedis
+from redis import StrictRedis
 from apscheduler.schedulers.tornado import TornadoScheduler
 
 class Scheduler:
@@ -68,7 +69,7 @@ class Scheduler:
         Note that the method should be static since pickle can't serialize self param.
         """
 
-        conn = redis.StrictRedis(**redis_conn_args)
+        conn = FakeStrictRedis() if not redis_conn_args else StrictRedis(**redis_conn_args)
         conn.publish(channel_name, json.dumps(message))
 
     def publish_now(self, message):

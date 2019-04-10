@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from datetime import date, timedelta
 import json
+import pickle
 
-import fakeredis
 import subprocess
 import sqlalchemy as sa  # Tests are running synchronously so we have to use sqlalchemy instead of gino.
 import testing.postgresql
@@ -39,8 +40,16 @@ CREATED_DATE = "1989-12-17T00:00:00+00:00"
 POSTGRES_URL = "postgresql://postgres:@localhost:5432/test"
 
 def compose(req):
+    current_date = date.today()
+    interview_date = current_date + timedelta(days=2)
+    START_DATE = "{year}-{month}-{day}T12:00:00+03:00".format(
+        year=interview_date.year,
+        month=interview_date.month,
+        day=interview_date.day
+    )
     return (req.replace('%ACCOUNT%', ACCOUNT)
-               .replace('%CREATED_DATE%', CREATED_DATE))
+               .replace('%CREATED_DATE%', CREATED_DATE)
+               .replace('%START_DATE%', START_DATE))
 
 
 class WebTestCase(AsyncHTTPTestCase):
@@ -79,26 +88,28 @@ class WebTestCase(AsyncHTTPTestCase):
 
         for table in (Interview, Candidate):
             self.conn.execute(table.delete)
+        text = sa.sql.text('DELETE FROM apscheduler_jobs')
+        self.conn.execute(text)
 
         self.conn.close()
         self._mock_postgres.stop()
 
 class HuntflowWebhookHandlerTest(WebTestCase):
     def get_handlers(self):
-        conn = fakeredis.FakeStrictRedis()
-        args = {
-            'postgres': {
-                'dbname': 'test',
-                'hostname': 'localhost',
-                'password': '',
-                'port': '5432',
-                'username': 'postgres',
-            },
-            'redis_conn': conn,
+        scheduler_args = {
+            'postgres_url': POSTGRES_URL,
+            'redis_args': '',
             'channel_name': 'stub',
         }
+        test_scheduler = scheduler.Scheduler(**scheduler_args)
+        test_scheduler.make()
+
+        app_args = {
+            'scheduler': test_scheduler,
+            'postgres_url': POSTGRES_URL,
+        }
         return [
-            ('/hf', handler.HuntflowWebhookHandler, args),
+            ('/hf', handler.HuntflowWebhookHandler, app_args),
         ]
 
     def test_broken_request(self):
@@ -158,6 +169,23 @@ class HuntflowWebhookHandlerTest(WebTestCase):
         self.assertEqual(row[Interview.start], interview_start)
         self.assertEqual(row[Interview.end], interview_end)
         self.assertEqual(row[Interview.type], event['type'])
+
+        text = sa.sql.text('SELECT job_state FROM apscheduler_jobs ORDER BY next_run_time')
+        result = self.conn.execute(text).fetchall()
+
+        evening_before_event_day = interview_start.replace(day=interview_start.day - 1,
+                                                           hour=18,
+                                                           minute=0,
+                                                           second=0
+                                                           )
+        morning_of_event_day = interview_start.replace(hour=7, minute=0, second=0)
+        an_hour_in_advance = interview_start - timedelta(hours=1)
+
+        date_tuple = (evening_before_event_day, morning_of_event_day, an_hour_in_advance)
+
+        for row, exp_datetime in zip(result, date_tuple):
+            job_state = pickle.loads(row[0])
+            self.assertEqual(job_state.get('next_run_time').replace(tzinfo=None), exp_datetime)
 
     def test_missing_calendar_event_item(self):
         response = self.fetch('/hf',
