@@ -14,6 +14,9 @@ addons:
     sources:
     - debian-sid
 
+services:
+  - postgresql
+
 before_install:
   - nvm install-latest-npm
 
@@ -23,6 +26,9 @@ install:
   # for eslint
   - npm install ms
   - npm install --only=dev
+
+before_script:
+  - psql -c 'create database test;' -U postgres
 
 script:
   # Disable duplicate-code since there are some problems related to it. One of

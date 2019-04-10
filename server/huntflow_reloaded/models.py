@@ -1,11 +1,6 @@
 """ Database GINO models """
 
-import sys
-
-if sys.argv[0].split('/')[-1] == 'testing.py':
-    from test.mock_gino import Gino
-else:
-    from gino.ext.tornado import Gino
+from gino.ext.tornado import Gino
 
 DB = Gino()
 

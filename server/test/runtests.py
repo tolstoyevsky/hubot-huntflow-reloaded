@@ -13,11 +13,13 @@
 # limitations under the License.
 
 import fakeredis
+import subprocess
 import testing.postgresql
+from tornado.ioloop import IOLoop
 from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application
 
-from huntflow_reloaded import handler
+from huntflow_reloaded import handler, scheduler
 from test import stubs
 
 
@@ -30,6 +32,7 @@ ACCOUNT = """
 
 CREATED_DATE = "1989-12-17T00:00:00+00:00"
 
+POSTGRES_URL = "postgresql://postgres:@localhost:5432/test"
 
 def compose(req):
     return (req.replace('%ACCOUNT%', ACCOUNT)
@@ -41,6 +44,7 @@ class WebTestCase(AsyncHTTPTestCase):
 
     Override get_handlers and get_app_kwargs instead of get_app.
     Append to wsgi_safe to have it run in wsgi_test as well.
+    Override get_new_ioloop to avoid creating a new loop for each test case.
     The code was borrowed from the original Tornado tests.
     """
     def get_app(self):
@@ -51,11 +55,17 @@ class WebTestCase(AsyncHTTPTestCase):
         super(WebTestCase, self).setUp()
         self._mock_postgres = testing.postgresql.Postgresql(port=5432)
 
+        command = 'server/alembic/migrate.sh ' + POSTGRES_URL
+        subprocess.Popen(command, shell=True).wait()
+
     def get_handlers(self):
         raise NotImplementedError()
 
     def get_app_kwargs(self):
         return {}
+
+    def get_new_ioloop(self):
+        return IOLoop.current()
 
     def tearDown(self):
         super(WebTestCase, self).tearDown()
