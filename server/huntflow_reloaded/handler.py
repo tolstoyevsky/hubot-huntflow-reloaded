@@ -144,6 +144,8 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
             self.set_status(500)
             return
 
+        self._logger.debug(body)
+
     #
     # Handlers
     #
