@@ -12,14 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+
 import fakeredis
 import subprocess
+import sqlalchemy as sa  # Tests are running synchronously so we have to use sqlalchemy instead of gino.
 import testing.postgresql
 from tornado.ioloop import IOLoop
 from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application
 
-from huntflow_reloaded import handler, scheduler
+from huntflow_reloaded import handler, scheduler, models
+from huntflow_reloaded.models import Candidate, Interview
 from test import stubs
 
 
@@ -58,6 +62,9 @@ class WebTestCase(AsyncHTTPTestCase):
         command = 'server/alembic/migrate.sh ' + POSTGRES_URL
         subprocess.Popen(command, shell=True).wait()
 
+        engine = sa.create_engine(POSTGRES_URL)
+        self.conn = engine.connect()
+
     def get_handlers(self):
         raise NotImplementedError()
 
@@ -69,6 +76,11 @@ class WebTestCase(AsyncHTTPTestCase):
 
     def tearDown(self):
         super(WebTestCase, self).tearDown()
+
+        for table in (Interview, Candidate):
+            self.conn.execute(table.delete)
+
+        self.conn.close()
         self._mock_postgres.stop()
 
 class HuntflowWebhookHandlerTest(WebTestCase):
@@ -117,11 +129,35 @@ class HuntflowWebhookHandlerTest(WebTestCase):
         self.assertEqual(response.body, b'Incomplete request')
 
     def test_handling_interview_request(self):
-        response = self.fetch('/hf',
-                              body=compose(stubs.INTERVIEW_REQUEST),
-                              method='POST')
+        body = compose(stubs.INTERVIEW_REQUEST)
+
+        response = self.fetch('/hf', body=body, method='POST')
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body, b'')
+
+        s = sa.sql.select([Candidate]).where(Candidate.id == 1)
+        result = self.conn.execute(s)
+        row = result.fetchone()
+        result.close()
+
+        event = json.loads(body)['event']
+        exp_candidate = event['applicant']
+        exp_row = (exp_candidate['id'], exp_candidate['first_name'], exp_candidate['last_name'])
+        self.assertEqual(row, exp_row)
+
+        calendar_event = event['calendar_event']
+
+        s = sa.sql.select([Interview]).where(Interview.candidate == exp_candidate['id'])
+        result = self.conn.execute(s)
+        row = result.fetchone()
+        result.close()
+
+        interview_start = handler.get_date_from_string(calendar_event['start'])
+        interview_end = handler.get_date_from_string(calendar_event['end'])
+
+        self.assertEqual(row[Interview.start], interview_start)
+        self.assertEqual(row[Interview.end], interview_end)
+        self.assertEqual(row[Interview.type], event['type'])
 
     def test_missing_calendar_event_item(self):
         response = self.fetch('/hf',

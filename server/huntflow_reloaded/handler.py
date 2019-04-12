@@ -197,15 +197,9 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
             .gino.all()
 
         if not calendar_event:
-            format_string = '%Y-%m-%dT%H:%M:%S%z'
-            regexp = r"(\+\d{1,2})(:)(\d{1,2})"
 
-            interview_start = datetime \
-                .strptime(re.sub(regexp, r"\1\3", start), format_string) \
-                .replace(tzinfo=None)
-            interview_end = datetime \
-                .strptime(re.sub(regexp, r"\1\3", _end), format_string) \
-                .replace(tzinfo=None)
+            interview_start = get_date_from_string(start)
+            interview_end = get_date_from_string(_end)
 
             today = datetime.now()
 
@@ -229,3 +223,16 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         """
         self._logger.info('Invoking the stub handler to serve the request of '
                           'the type %s', self._req_type)
+
+
+def get_date_from_string(date_string):
+    """Transforms the specified date string into a proper datetime object. """
+
+    format_string = '%Y-%m-%dT%H:%M:%S%z'
+    regexp = r"(\+\d{1,2})(:)(\d{1,2})"
+
+    data = datetime \
+        .strptime(re.sub(regexp, r"\1\3", date_string), format_string) \
+        .replace(tzinfo=None)
+
+    return data
