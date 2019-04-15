@@ -1,12 +1,13 @@
 """ Scheduler module """
 
-import re
 import json
-from datetime import timedelta, datetime
+from datetime import timedelta
 
 from fakeredis import FakeStrictRedis
 from redis import StrictRedis
 from apscheduler.schedulers.tornado import TornadoScheduler
+
+from huntflow_reloaded import handler
 
 class Scheduler:
     """Class encapsulating scheduling logic. """
@@ -36,10 +37,7 @@ class Scheduler:
         * remind in the evening before the event day.
         """
 
-        time_string = re.sub(r"(\+\d{1,2})(:)(\d{1,2})", r"\1\3", message['start'])
-        date = datetime \
-            .strptime(time_string, '%Y-%m-%dT%H:%M:%S%z') \
-            .replace()
+        date = handler.get_date_from_string(message['start'])
 
         args = (message, self.redis_args, self.channel_name)
 
