@@ -100,6 +100,9 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
         self._redis_conn = redis_conn
         self._postgres_data = postgres
         self._logger = logger
+        handler = AsyncFileHandler(
+            filename='/var/log/huntflow-reloaded-server.log')
+        self._logger.addHandler(handler)
 
     def _classify_request(self):
         try:

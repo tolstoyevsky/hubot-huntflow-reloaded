@@ -80,7 +80,7 @@ def main():
         }
     }
     args = {
-        'logger' : async_logger.with_default_handlers(name='tornado.application'),
+        'logger' : logger,
         'postgres': {
             'dbname': options.postgres_dbname,
             'hostname': options.postgres_host,
