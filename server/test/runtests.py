@@ -173,11 +173,10 @@ class HuntflowWebhookHandlerTest(WebTestCase):
         text = sa.sql.text('SELECT job_state FROM apscheduler_jobs ORDER BY next_run_time')
         result = self.conn.execute(text).fetchall()
 
-        evening_before_event_day = interview_start.replace(day=interview_start.day - 1,
-                                                           hour=18,
+        evening_before_event_day = interview_start.replace(hour=18,
                                                            minute=0,
                                                            second=0
-                                                           )
+                                                           ) - timedelta(days=1)
         morning_of_event_day = interview_start.replace(hour=7, minute=0, second=0)
         an_hour_in_advance = interview_start - timedelta(hours=1)
 

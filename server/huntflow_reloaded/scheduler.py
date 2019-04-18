@@ -48,11 +48,10 @@ class Scheduler:
         self.add(date=morning_of_event_day, func=self.notify_interview, args=args)
 
         evening_before_event_day = date.replace(
-            day=date.day - 1,
             hour=18,
             minute=0,
             second=0
-        )
+        ) - timedelta(days=1)
         self.add(date=evening_before_event_day, func=self.notify_interview, args=args)
 
     def make(self):
