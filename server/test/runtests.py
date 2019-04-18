@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import json
 import pickle
 
@@ -47,9 +47,13 @@ def compose(req, count=2):
         month=interview_date.month,
         day=interview_date.day
     )
+    EMPLOYMENT_DATE = "{year}-{month}-{day}".format(year=current_date.year,
+                                                    month=current_date.month,
+                                                    day=current_date.day)
     return (req.replace('%ACCOUNT%', ACCOUNT)
                .replace('%CREATED_DATE%', CREATED_DATE)
-               .replace('%START_DATE%', START_DATE))
+               .replace('%START_DATE%', START_DATE)
+               .replace('%EMPLOYMENT_DATE%', EMPLOYMENT_DATE))
 
 
 class WebTestCase(AsyncHTTPTestCase):
@@ -222,3 +226,39 @@ class HuntflowWebhookHandlerTest(WebTestCase):
                               method='POST')
         self.assertEqual(response.code, 500)
         self.assertEqual(response.body, b'Could not decode request body. There must be valid JSON')
+
+    def test_employment_date(self):
+        body = compose(stubs.INTERVIEW_REQUEST)
+        response = self.fetch('/hf', body=body, method='POST')
+        self.assertEqual(response.code, 200)
+        self.assertEqual(response.body, b'')
+
+        candidate_id = json.loads(body)['event']['applicant']['id']
+        s = sa.sql.select([Interview]).where(
+            Interview.candidate == candidate_id)
+        interview = self.conn.execute(s).fetchall()
+        self.assertEqual(len(interview), 1)
+
+        jobs_id = json.loads(interview[0].jobs)
+
+        # Mocking of expired jobs
+        for job_id in jobs_id:
+            self.test_scheduler.remove_job(job_id)
+
+        body = compose(stubs.FWD_REQUEST)
+        response = self.fetch('/hf', body=body, method='POST')
+        self.assertEqual(response.code, 200)
+        self.assertEqual(response.body, b'')
+
+        text = sa.sql.text('SELECT job_state FROM apscheduler_jobs')
+        result = self.conn.execute(text).fetchall()
+        self.assertEqual(len(result), 1)
+
+        for row in result:
+            job_state = pickle.loads(row[0])
+
+        fwd_date = json.loads(body)['event']['employment_date']
+        exp_datetime = self.test_scheduler.get_day_after_fwd(fwd_date)
+
+        self.assertEqual(
+            job_state.get('next_run_time').replace(tzinfo=None), exp_datetime)

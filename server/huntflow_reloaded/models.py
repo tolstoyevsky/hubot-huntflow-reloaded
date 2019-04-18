@@ -9,7 +9,7 @@ class Candidate(DB.Model):
 
     __tablename__ = 'candidates'
 
-    id = DB.Column(DB.Integer())  # pylint: disable=maybe-no-member
+    id = DB.Column(DB.Integer(), primary_key=True)  # pylint: disable=maybe-no-member
 
     first_name = DB.Column(DB.String())  # pylint: disable=maybe-no-member
     last_name = DB.Column(DB.String())  # pylint: disable=maybe-no-member

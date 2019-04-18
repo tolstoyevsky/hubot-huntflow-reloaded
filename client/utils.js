@@ -28,6 +28,22 @@ function buildReport (data) {
 
   // Parse data
   for (const item of data) {
+    if (item.type === 'fwd') {
+      let fwd = moment(item.employment_date)
+      const amount = fwd.diff(moment().startOf('day'), 'days')
+
+      const when = (amount) => {
+        if (amount === 1) {
+          return 'завтра'
+        }
+        if (amount === 0) {
+          return 'сегодня'
+        }
+        return fwd.format('DD.MM')
+      }
+      return `${item.first_name} ${item.last_name} выходит на работу ${when(amount)}.`
+    }
+
     const now = moment()
     const start = moment(item.start)
 

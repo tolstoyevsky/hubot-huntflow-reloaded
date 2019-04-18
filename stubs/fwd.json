@@ -1,0 +1,17 @@
+{
+    "account": {
+        "id": 1,
+        "name": "Noname"
+    },
+    "event": {
+        "created": "%CREATED_DATE%",
+        "type": "STATUS",
+        "applicant": {
+            "id": 1,
+            "first_name": "Matt",
+            "last_name": "Groening"
+        },
+        "calendar_event": null,
+        "employment_date": "2018-12-05"
+    }
+}

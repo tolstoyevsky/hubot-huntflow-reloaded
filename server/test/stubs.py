@@ -76,3 +76,19 @@ INTERVIEW_REQUEST = """{
     }
 }
 """
+
+FWD_REQUEST = """{
+    %ACCOUNT%,
+    "event": {
+        "created": "%CREATED_DATE%",
+        "type": "STATUS",
+        "applicant": {
+            "id": 1,
+            "first_name": "Matt",
+            "last_name": "Groening"
+        },
+        "calendar_event": null,
+        "employment_date": "%EMPLOYMENT_DATE%"
+    }
+}
+"""

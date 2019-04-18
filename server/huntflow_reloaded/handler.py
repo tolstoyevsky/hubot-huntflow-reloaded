@@ -43,7 +43,7 @@ class UnknownType(Exception):
     """
 
 
-class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
+class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method,too-many-instance-attributes
     """Class implementing a Huntflow Webhook handler. """
 
     ADD_TYPE = 1
@@ -63,6 +63,11 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         self._handlers = {}
         self._logger = logging.getLogger('tornado.application')
         self._req_type = None
+        self.basic_attrs = {}
+        self.event = {}
+        self.event_type = ''
+        self.context = {}
+        self.message = {}
 
         for i in dir(self):
             if i.endswith('_TYPE'):
@@ -103,6 +108,16 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
 
     def _process_request(self):
         pass
+
+    def _form_valid_basic_attrs(self):
+        applicant = self.event['applicant']
+
+        try:
+            self.basic_attrs['_id'] = applicant['id']
+            self.basic_attrs['first_name'] = applicant['first_name']
+            self.basic_attrs['last_name'] = applicant['last_name']
+        except KeyError:
+            raise IncompleteRequest
 
     async def post(self):  # pylint: disable=arguments-differ
         body = self.request.body.decode('utf8')
@@ -154,39 +169,56 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         """Invokes when a request of the 'REMOVED' type is received. """
         self._logger.info("Handling 'removed' request")
 
-    async def status_type_handler(self):  # pylint: disable=too-many-locals
-        """Invokes when a request of the 'STATUS' type is received. """
+    async def status_type_handler(self):
+        """Invokes when a request of the 'STATUS' type is received:
+        * setting interview;
+        * resetting interview;
+        * setting the first working day.
+        """
 
         self._logger.info("Handling 'status' request")
 
-        event = self._decoded_body['event']
-        if not event.get('calendar_event'):
+        self.event = self._decoded_body['event']
+
+        self._form_valid_basic_attrs()
+
+        if self.event.get('calendar_event'):
+            await self.handle_calendar_event()
+        elif self.event.get('employment_date'):
+            await self.handle_employment_date()
+        else:
             raise IncompleteRequest
 
+        self._scheduler.publish_now(self.message)
+        await self._scheduler.create_event(self.event_type,
+                                           context=self.context)
+
+    async def handle_calendar_event(self):
+        """Handles the setting and rescheduling of the interview. """
+
+        calendar_event = self.event['calendar_event']
+
         try:
-            _id = event['applicant']['id']
-            first_name = event['applicant']['first_name']
-            last_name = event['applicant']['last_name']
-            start = event['calendar_event']['start']
-            _end = event['calendar_event']['end']
+            start = calendar_event['start']
+            _end = calendar_event['end']
         except KeyError:
             raise IncompleteRequest
 
         message_type = 'interview'
+        _id = self.basic_attrs['_id']
 
         candidate = await models.Candidate.query.where(models.Candidate.id == _id).gino.all()
 
         if not candidate:
-            options = {
-                "id": _id,
-                "first_name": first_name,
-                "last_name": last_name
-            }
-            await models.Candidate.create(**options)
+            await models.Candidate.create(
+                id=self.basic_attrs['_id'],
+                first_name=self.basic_attrs['first_name'],
+                last_name=self.basic_attrs['last_name']
+            )
 
         interview = await models.Interview.query \
             .where(models.Interview.candidate == _id) \
-            .where(models.Interview.type == event.get('type')) \
+            .where(models.Interview.type == self.event.get('type')) \
             .gino.first()
 
         if interview:
@@ -207,7 +239,7 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
 
         options = {
             "created": today,
-            "type": event.get('type'),
+            "type": self.event.get('type'),
             "candidate": _id,
             "start": interview_start,
             "end": interview_end
@@ -215,15 +247,37 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
 
         interview = await models.Interview.create(**options)
 
-        message = {
+        self.event_type = 'schedule_interview'
+
+        self.message = {
             "type": message_type,
-            "first_name": first_name,
-            "last_name": last_name,
+            "first_name": self.basic_attrs['first_name'],
+            "last_name": self.basic_attrs['last_name'],
             "start": start,
         }
 
-        await self._scheduler.create_event(message, interview)
-        self._scheduler.publish_now(message)
+        self.context = {"message": self.message,
+                        "interview": interview}
+
+    async def handle_employment_date(self):
+        """Handles the setting of the first working day. """
+
+        try:
+            employment_date = self.event['employment_date']
+        except KeyError:
+            raise IncompleteRequest
+
+        self.event_type = 'remove_candidate'
+
+        self.message = {
+            'type': 'fwd',
+            'first_name': self.basic_attrs['first_name'],
+            'last_name': self.basic_attrs['last_name'],
+            'employment_date': employment_date,
+        }
+
+        self.context = {'employment_date': employment_date,
+                        'candidate_id': self.basic_attrs['_id']}
 
     async def stub_handler(self):
         """Invokes when a type is registered but there is no handler defined
