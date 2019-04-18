@@ -4,6 +4,20 @@ from gino.ext.tornado import Gino
 
 DB = Gino()
 
+
+class User(DB.Model):
+    """  """
+
+    __tablename__ = 'users'
+
+    id = DB.Column(DB.Integer(), primary_key=True, autoincrement=True)
+
+    email = DB.Column(DB.String())
+    password = DB.Column(DB.String())
+
+    __table_args__ = (DB.UniqueConstraint('id'), DB.UniqueConstraint('email'))
+
+
 class Candidate(DB.Model):
     """ Candidate for vacancy model """
 

@@ -17,14 +17,18 @@
 
 """Utility for controlling(creating/deleting/printing) the clients instances"""
 
+import asyncio
 import os
 import secrets
 import smtplib
 import ssl
 import string
+from asyncpg.exceptions import UniqueViolationError
 from argparse import ArgumentParser
 from dotenv import load_dotenv
 from email.message import EmailMessage
+from gino.exceptions import GinoException
+from huntflow_reloaded.models import DB, User, gino_run
 
 load_dotenv()
 
@@ -35,7 +39,8 @@ SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 
 
 def send_mail(smtp_server, port, sender_email, sender_password, receiver_email,
-              data):
+              message):
+    """Sending credentials to user. """
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL(smtp_server, port, context=context) as server:
         server.login(sender_email, sender_password)
@@ -43,7 +48,7 @@ def send_mail(smtp_server, port, sender_email, sender_password, receiver_email,
         msg['Subject'] = "Your credentials"
         msg['From'] = sender_email
         msg['To'] = receiver_email
-        msg.set_content(data)
+        msg.set_content(message)
         server.sendmail(sender_email, receiver_email, msg.as_string())
 
 
@@ -53,9 +58,13 @@ def generate_password(pass_len):
     return ''.join(secrets.choice(chars_set) for _ in range(pass_len))
 
 
-def create_user(email, password):
+async def create_user(email, password):
     """Creating the user instance. """
-    return True
+    record = await User.create(
+        email=email,
+        password=password
+    )
+    return record
 
 
 def delete_user(email):
@@ -103,13 +112,27 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    loop = asyncio.get_event_loop()
+
     if args.command == 'create':
         # TODO: create instance here
         password = generate_password(args.pass_len)
-        result = create_user(args.email, password)
-        if result and args.send_email:
-            send_mail(args.email)
-    elif args.commmand == 'delete':
+        loop.run_until_complete(
+            gino_run('postgresql://postgres:1488@localhost:5432/gino'))
+        try:
+            result = loop.run_until_complete(create_user(args.email, password))
+        except UniqueViolationError:
+          pass
+        else:
+            if result and args.send_email:
+                message = "Your credentials\n Login: {}\nPassword:{}".format(args.email, password)
+                send_mail(smtp_server=SMTP_SERVER, port=PORT,
+                          sender_email=SENDER_EMAIL,
+                          sender_password=SENDER_PASSWORD,
+                          receiver_email=args.email, message=message)
+        finally:
+            loop.close()
+    elif args.command == 'delete':
         pass
-    elif args.commmand == 'list':
+    elif args.command == 'list':
         pass
