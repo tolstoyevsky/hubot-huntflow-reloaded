@@ -1,0 +1,277 @@
+#!/usr/bin/python3
+# Copyright 2019 Anton Maksimovich <antonio.maksimovich@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+"""Utility for controlling (creating/deleting/printing) the clients instances. """
+
+import asyncio
+import re
+import os
+import secrets
+import ssl
+import string
+import sys
+from argparse import ArgumentParser
+from email.message import EmailMessage
+from smtplib import SMTP_SSL, SMTPException
+
+from asyncpg.exceptions import UniqueViolationError
+from dotenv import load_dotenv
+
+from huntflow_reloaded.models import User, gino_run
+
+
+load_dotenv()
+
+EMAIL_RE = r'[^@]+@[^@]+\.[^@]+'
+
+
+def is_valid_email(email):
+    """Checking email. """
+    return bool(re.match(EMAIL_RE, email))
+
+
+# pylint: disable=redefined-outer-name
+def send_mail(smtp_server, port, sender_email, sender_password, receiver_email,  # pylint: disable=too-many-arguments
+              message):
+    """Sending credentials to user. """
+    context = ssl.create_default_context()
+    with SMTP_SSL(smtp_server, port, context=context) as server:
+        server.login(sender_email, sender_password)
+        msg = EmailMessage()
+        msg['Subject'] = 'Your hubot-huntflow credentials'
+        msg['From'] = sender_email
+        msg['To'] = receiver_email
+        msg.set_content(message)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+
+
+def safe_send_mail_with_retries(smtp_server, port, sender_email,  # pylint: disable=too-many-arguments
+                                sender_password, receiver_email, message,
+                                attempts_number):
+    """Sending email with retries and catching exceptions. """
+    result = False
+    for _ in range(attempts_number):
+        try:
+            send_mail(smtp_server, port, sender_email,
+                      sender_password, receiver_email, message)
+        except SMTPException:
+            continue
+        else:
+            result = True
+            break
+    return result
+
+
+def generate_password(pass_len):
+    """Creating a password of the specified length. """
+    chars_set = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(chars_set) for _ in range(pass_len))
+
+
+async def create_user(email, password):  # pylint: disable=redefined-outer-name
+    """Creating the user instance. """
+    record = await User.create(
+        email=email,
+        password=password
+    )
+    return record
+
+
+async def get_password(email):
+    """Getting user password. """
+    user = await User.query.where(User.email == email).gino.all()
+    if not user:
+        return False
+    return user[0].password
+
+
+async def delete_user(email):
+    """Deleting the user instance. """
+    user = await User.query.where(User.email == email).gino.all()
+    if not user:
+        return False
+    user = user[0]
+    await user.delete()
+    return True
+
+
+async def list_of_users():
+    """Printing the list of users. """
+    all_users = await User.query.gino.all()
+    return all_users
+
+
+def connect_to_postgres(loop, connection_str):
+    """Connecting to postgres server. """
+    loop.run_until_complete(gino_run(connection_str))
+
+
+def parse_args():
+    """Parsing command line arguments. """
+    parser = ArgumentParser()
+    parser.add_argument('--postgres-pass', dest='postgres_pass', type=str,
+                        help='PostgreSQL user password', default='')
+    parser.add_argument('--postgres-user', dest='postgres_user', type=str,
+                        help='PostgreSQL user name', default='postgres')
+    parser.add_argument('--postgres-host', dest='postgres_host', type=str,
+                        help='PostgreSQL host', default='localhost')
+    parser.add_argument('--postgres-port', dest='postgres_port', type=str,
+                        help='PostgreSQL port', default='5432')
+    parser.add_argument('--postgres-dbname', dest='postgres_dbname',
+                        type=str, help='Huntflow database name',
+                        default="huntflow-reloaded")
+
+    subparsers = parser.add_subparsers(help='commands', dest='command')
+
+    # create command
+    parser_create = subparsers.add_parser('create',
+                                          help='create the user instance')
+    parser_create.add_argument('-e', '--email', dest='email', type=str,
+                               help='user email', required=True)
+    parser_create.add_argument('-l', '--pass-len', dest='pass_len', type=int,
+                               help='length of autogenerated password',
+                               default=8)
+    parser_create.add_argument('-s', '--send-email', dest='send_email',
+                               action='store_true',
+                               help='sending credentials to user after '
+                                    'creating')
+    parser_create.add_argument('-c', '--count-resend', dest='count_resend',
+                               type=int, default=5,
+                               help='count of resend attempts')
+
+    # delete command
+    parser_delete = subparsers.add_parser('delete',
+                                          help='delete the user instance')
+    parser_delete.add_argument('-e', '--email', dest='email', type=str,
+                               help='user email', required=True)
+
+    # list command
+    subparsers.add_parser('list', help='print the list of users')
+
+    # resend command
+    parser_resend = subparsers.add_parser('resend',
+                                          help='resend the credentials')
+    parser_resend.add_argument('-e', '--email', dest='email', type=str,
+                               help='user email', required=True)
+
+    return parser.parse_args()
+
+
+def main():  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+    """Main function. """
+    args = parse_args()
+
+    loop = asyncio.get_event_loop()
+
+    postgres_host = os.getenv('POSTGRES_HOST')
+    postgres_user = os.getenv('POSTGRES_USER')
+    postgres_password = os.getenv('POSTGRES_PASSWORD')
+    postgres_port = os.getenv('POSTGRES_PORT')
+    postgres_dbname = os.getenv('POSTGRES_DBNAME')
+    smtp_server = os.getenv('SMTP_SERVER')
+    smtp_port = os.getenv('SMTP_PORT')
+    sender_email = os.getenv('SENDER_EMAIL')
+    sender_password = os.getenv('SENDER_PASSWORD')
+
+    if args.postgres_pass:
+        postgres_password = args.postgres_pass
+    if args.postgres_user:
+        postgres_user = args.postgres_user
+    if args.postgres_host:
+        postgres_host = args.postgres_host
+    if args.postgres_port:
+        postgres_port = args.postgres_port
+    if args.postgres_dbname:
+        postgres_dbname = args.postgres_dbname
+
+    connection_str = 'postgresql://{}:{}@{}:{}/{}'.format(postgres_user,
+                                                          postgres_password,
+                                                          postgres_host,
+                                                          postgres_port,
+                                                          postgres_dbname)
+
+    loop.run_until_complete(gino_run(connection_str))
+
+    if args.command == 'create':
+        password = generate_password(args.pass_len)
+        if not is_valid_email(args.email):
+            sys.stderr.write('Not valid email!\n')
+            sys.exit(1)
+        try:
+            result = loop.run_until_complete(create_user(args.email, password))
+        except UniqueViolationError:
+            sys.stderr.write('Non unique email!\n')
+        else:
+            sys.stderr.write("User created successfully!\n")
+            if result and args.send_email:
+                if not all([smtp_server, smtp_port, sender_email,
+                            sender_password]):
+                    sys.stderr.write('SMTP server config not found!\n')
+                    sys.exit(1)
+                message = 'Your hubot-huntflow credentials\nLogin: {}\n' \
+                          'Password: {}'.format(args.email, password)
+                result = safe_send_mail_with_retries(smtp_server, smtp_port,
+                                                     sender_email,
+                                                     sender_password,
+                                                     args.email, message,
+                                                     args.count_resend)
+                if result:
+                    sys.stderr.write('Message was sent successfully!')
+                else:
+                    sys.stderr.write(
+                        'Message hasn\'t been sent due to SMTP error'
+                        '({} attempts)!\n'.format(args.count_resend))
+
+        finally:
+            loop.close()
+    elif args.command == 'delete':
+        result = loop.run_until_complete(delete_user(args.email))
+        if not result:
+            sys.stderr.write('User {} does not exist!\n'.format(args.email))
+            sys.exit(1)
+        sys.stderr.write("User deleted successfully!\n")
+        loop.close()
+    elif args.command == 'list':
+        users = loop.run_until_complete(list_of_users())
+        loop.close()
+        if not users:
+            sys.stderr.write('Users were not found!\n')
+        else:
+            pretty_users = ['login: {};'.format(user.email) for user in users]
+            sys.stderr.write('\n'.join(pretty_users))
+    elif args.command == 'resend':
+        if not all([smtp_server, smtp_port, sender_email, sender_password]):
+            sys.stderr.write('SMTP server config not found!\n')
+            sys.exit(1)
+        password = loop.run_until_complete(get_password(args.email))
+        if not password:
+            sys.stderr.write('User was not found!\n')
+            sys.exit(1)
+        message = 'Your credentials\nLogin: {}\nPassword: {}'.format(
+            args.email, password)
+        result = safe_send_mail_with_retries(smtp_server, smtp_port,
+                                             sender_email,
+                                             sender_password,
+                                             args.email, message, 1)
+        if result:
+            sys.stderr.write('Message was sent successfully!\n')
+        else:
+            sys.stderr.write(
+                'Message was not sent due to SMTP error\n')
+
+
+if __name__ == '__main__':
+    main()

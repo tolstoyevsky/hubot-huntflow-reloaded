@@ -8,3 +8,4 @@ Thanks to all the contributors to the project. Here are the full list of the peo
 
 * [Polina Popova](https://github.com/polina-popova)
 * [Semyon Suprun](https://github.com/BehindLoader)
+* [Anton Maksimovich](https://github.com/ABSLord)
