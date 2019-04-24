@@ -6,7 +6,13 @@ const moment = require('moment')
  */
 function makeMessageFromEventJSON (json) {
   const time = moment(json.start).format('HH:mm')
-  return `${time} - ${json.first_name} ${json.last_name}`
+  let message = `${time} - ${json.first_name} ${json.last_name}`
+
+  if (json.type === 'rescheduled-interview') {
+    message += ' (перенесено)'
+  }
+
+  return message
 }
 
 /**

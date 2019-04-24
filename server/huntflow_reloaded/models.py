@@ -31,6 +31,8 @@ class Interview(DB.Model):
     start = DB.Column(DB.DateTime())  # pylint: disable=maybe-no-member
     end = DB.Column(DB.DateTime())  # pylint: disable=maybe-no-member
 
+    jobs = DB.Column(DB.JSON())  # pylint: disable=maybe-no-member
+
     __table_args__ = (DB.UniqueConstraint('id'))  # pylint: disable=maybe-no-member
 
 async def gino_run(postgres_url):

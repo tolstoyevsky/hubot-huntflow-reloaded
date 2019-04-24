@@ -39,9 +39,9 @@ CREATED_DATE = "1989-12-17T00:00:00+00:00"
 
 POSTGRES_URL = "postgresql://postgres:@localhost:5432/test"
 
-def compose(req):
+def compose(req, count=2):
     current_date = date.today()
-    interview_date = current_date + timedelta(days=2)
+    interview_date = current_date + timedelta(days=count)
     START_DATE = "{year}-{month}-{day}T12:00:00+03:00".format(
         year=interview_date.year,
         month=interview_date.month,
@@ -101,11 +101,11 @@ class HuntflowWebhookHandlerTest(WebTestCase):
             'redis_args': '',
             'channel_name': 'stub',
         }
-        test_scheduler = scheduler.Scheduler(**scheduler_args)
-        test_scheduler.make()
+        self.test_scheduler = scheduler.Scheduler(**scheduler_args)
+        self.test_scheduler.make()
 
         app_args = {
-            'scheduler': test_scheduler,
+            'scheduler': self.test_scheduler,
             'postgres_url': POSTGRES_URL,
         }
         return [
@@ -173,16 +173,46 @@ class HuntflowWebhookHandlerTest(WebTestCase):
         text = sa.sql.text('SELECT job_state FROM apscheduler_jobs ORDER BY next_run_time')
         result = self.conn.execute(text).fetchall()
 
-        evening_before_event_day = interview_start.replace(hour=18,
-                                                           minute=0,
-                                                           second=0
-                                                           ) - timedelta(days=1)
-        morning_of_event_day = interview_start.replace(hour=7, minute=0, second=0)
-        an_hour_in_advance = interview_start - timedelta(hours=1)
+        date_tuple = self.test_scheduler.get_scheduled_dates(interview_start)
 
-        date_tuple = (evening_before_event_day, morning_of_event_day, an_hour_in_advance)
+        for row, exp_datetime in zip(result, sorted(date_tuple)):
+            job_state = pickle.loads(row[0])
+            self.assertEqual(job_state.get('next_run_time').replace(tzinfo=None), exp_datetime)
 
-        for row, exp_datetime in zip(result, date_tuple):
+    def test_reschedule_interview(self):
+        response = self.fetch('/hf', body=compose(stubs.INTERVIEW_REQUEST),
+                              method='POST')
+        self.assertEqual(response.code, 200)
+        self.assertEqual(response.body, b'')
+
+        rescheduled_interview = compose(stubs.INTERVIEW_REQUEST, count=5)
+        response = self.fetch('/hf', body=rescheduled_interview, method='POST')
+        self.assertEqual(response.code, 200)
+        self.assertEqual(response.body, b'')
+
+        event = json.loads(rescheduled_interview)['event']
+        exp_candidate = event['applicant']
+        calendar_event = event['calendar_event']
+
+        s = sa.sql.select([Interview]).where(Interview.candidate == exp_candidate['id'])
+        result = self.conn.execute(s).fetchall()
+        self.assertEqual(len(result), 1)
+
+        row = result[0]
+
+        interview_start = handler.get_date_from_string(calendar_event['start'])
+        interview_end = handler.get_date_from_string(calendar_event['end'])
+
+        self.assertEqual(row[Interview.start], interview_start)
+        self.assertEqual(row[Interview.end], interview_end)
+        self.assertEqual(row[Interview.type], event['type'])
+
+        text = sa.sql.text('SELECT job_state FROM apscheduler_jobs ORDER BY next_run_time')
+        result = self.conn.execute(text).fetchall()
+
+        date_tuple = self.test_scheduler.get_scheduled_dates(interview_start)
+
+        for row, exp_datetime in zip(result, sorted(date_tuple)):
             job_state = pickle.loads(row[0])
             self.assertEqual(job_state.get('next_run_time').replace(tzinfo=None), exp_datetime)
 

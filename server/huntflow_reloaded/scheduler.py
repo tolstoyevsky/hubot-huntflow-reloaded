@@ -23,36 +23,34 @@ class Scheduler:
     def add(self, date, func, args):
         """Shortcut for adding new events. """
 
-        self.scheduler.add_job(
+        job = self.scheduler.add_job(
             func=func,
             trigger='date',
             next_run_time=date,
             args=args
         )
+        return job
 
-    def create_event(self, message):
+    async def create_event(self, message, interview):
         """Schedules the events:
         * remind an hour in advance;
         * remind in the morning of the event day;
         * remind in the evening before the event day.
         """
 
-        date = handler.get_date_from_string(message['start'])
+        interview_date = handler.get_date_from_string(message['start'])
 
         args = (message, self.redis_args, self.channel_name)
 
-        an_hour_in_advance = date - timedelta(hours=1)
-        self.add(date=an_hour_in_advance, func=self.notify_interview, args=args)
+        scheduled_dates = self.get_scheduled_dates(interview_date)
 
-        morning_of_event_day = date.replace(hour=7, minute=0, second=0)
-        self.add(date=morning_of_event_day, func=self.notify_interview, args=args)
+        jobs = []
 
-        evening_before_event_day = date.replace(
-            hour=18,
-            minute=0,
-            second=0
-        ) - timedelta(days=1)
-        self.add(date=evening_before_event_day, func=self.notify_interview, args=args)
+        for scheduled_date in scheduled_dates:
+            job = self.add(date=scheduled_date, func=self.notify_interview, args=args)
+            jobs.append(job.id)
+
+        await interview.update(jobs=json.dumps(jobs)).apply()
 
     def make(self):
         """Runs the scheduler workers. """
@@ -73,3 +71,23 @@ class Scheduler:
         """Publishes message in Redis channel immediately. """
 
         self.notify_interview(message, self.redis_args, self.channel_name)
+
+    @staticmethod
+    def get_scheduled_dates(interview_date):
+        """Calculates the dates to be used as triggers for scheduler jobs. """
+
+        an_hour_in_advance = interview_date - timedelta(hours=1)
+        morning_of_event_day = interview_date.replace(hour=7, minute=0, second=0)
+        evening_before_event_day = interview_date.replace(
+            hour=18,
+            minute=0,
+            second=0
+        ) - timedelta(days=1)
+        return an_hour_in_advance, morning_of_event_day, evening_before_event_day
+
+    def remove_job(self, job_id):
+        """Shortcut for removing scheduler job by id. """
+
+        job = self.scheduler.get_job(job_id)
+        if job:
+            job.remove()

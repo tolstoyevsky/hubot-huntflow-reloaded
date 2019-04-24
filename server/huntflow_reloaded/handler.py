@@ -172,12 +172,7 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         except KeyError:
             raise IncompleteRequest
 
-        message = {
-            'type': 'interview',
-            'first_name': first_name,
-            'last_name': last_name,
-            'start': start,
-        }
+        message_type = 'interview'
 
         candidate = await models.Candidate.query.where(models.Candidate.id == _id).gino.all()
 
@@ -189,30 +184,45 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
             }
             await models.Candidate.create(**options)
 
-        calendar_event = await models.Interview.query \
+        interview = await models.Interview.query \
             .where(models.Interview.candidate == _id) \
             .where(models.Interview.type == event.get('type')) \
-            .gino.all()
+            .gino.first()
 
-        if not calendar_event:
+        if interview:
+            message_type = 'rescheduled-interview'
 
-            interview_start = get_date_from_string(start)
-            interview_end = get_date_from_string(_end)
+            if interview.jobs:
+                jobs_to_be_deleted = json_decode(interview.jobs)
 
-            today = datetime.now()
+                for job_id in jobs_to_be_deleted:
+                    self._scheduler.remove_job(job_id)
 
-            options = {
-                "created": today,
-                "type": event.get('type'),
-                "candidate": _id,
-                "start": interview_start,
-                "end": interview_end
-            }
+            await models.Interview.delete.where(models.Interview.candidate == _id).gino.status()
 
-            await models.Interview.create(**options)
+        interview_start = get_date_from_string(start)
+        interview_end = get_date_from_string(_end)
 
-        self._scheduler.create_event(message)
+        today = datetime.now()
 
+        options = {
+            "created": today,
+            "type": event.get('type'),
+            "candidate": _id,
+            "start": interview_start,
+            "end": interview_end
+        }
+
+        interview = await models.Interview.create(**options)
+
+        message = {
+            "type": message_type,
+            "first_name": first_name,
+            "last_name": last_name,
+            "start": start,
+        }
+
+        await self._scheduler.create_event(message, interview)
         self._scheduler.publish_now(message)
 
     async def stub_handler(self):
