@@ -87,20 +87,23 @@ To build the Docker image, run `make` from the same directory. In a while, the `
 
 The server can be configured via the following command line options or environment variables if you run it in a Docker container.
 
-| Environment variables | Command line options   | Description                                                                    | Default                                   |
-|-----------------------|------------------------|--------------------------------------------------------------------------------|-------------------------------------------|
-|`LOGLEVEL`             | `--logging`            | Logs level.                                                                    | `info`                                    |
-|`LOG_FILE`             | `--log-file-prefix`    | File where log information will be stored.                                     | `/var/log/huntflow-reloaded-server.log`   |
-|`POSTGRES_DBNAME`      | `--postgres-dbname`    | Database name.                                                                 | `huntflow-reloaded`                       |
-|`POSTGRES_HOST`        | `--postgres-host`      | PostgreSQL host.                                                               | 127.0.0.1                                 |
-|`POSTGRES_PORT`        | `--postgres-port`      | Port PostgreSQL listens on.                                                    | `5432`                                    |
-|`POSTGRES_USER`        | `--postgres-user`      | PostgreSQL user name.                                                          | postgres                                  |
-|`POSTGRES_PASSWORD`    | `--postgres-pass`      | Password of the above-mentioned PostgreSQL user.                               |                                           |
-|`REDIS_HOST`           | `--redis-host`         | Redis host.                                                                    | 127.0.0.1                                 |
-|`REDIS_PORT`           | `--redis-port`         | Port Redis listens on.                                                         | `6379` or `16379` (in a Docker container) |
-|`REDIS_PASSWORD`       | `--redis-password`     | Redis password.                                                                |                                           |
-|`CHANNEL_NAME`         | `--channel-name`       | Redis channel name to be used for communication between the server and client. | `hubot-huntflow-reloaded`                 |
-|`TZ`                   |                        | Timezone for for scheduler **(for Docker container only)**.                    | Europe/Moscow                             |
+| Environment variables   | Command line options   | Description                                                                    | Default                                   |
+|-------------------------|------------------------|--------------------------------------------------------------------------------|-------------------------------------------|
+|`LOGLEVEL`               | `--logging`            | Logs level.                                                                    | `info`                                    |
+|`LOG_FILE`               | `--log-file-prefix`    | File where log information will be stored.                                     | `/var/log/huntflow-reloaded-server.log`   |
+|`POSTGRES_DBNAME`        | `--postgres-dbname`    | Database name.                                                                 | `huntflow-reloaded`                       |
+|`POSTGRES_HOST`          | `--postgres-host`      | PostgreSQL host.                                                               | 127.0.0.1                                 |
+|`POSTGRES_PORT`          | `--postgres-port`      | Port PostgreSQL listens on.                                                    | `5432`                                    |
+|`POSTGRES_USER`          | `--postgres-user`      | PostgreSQL user name.                                                          | postgres                                  |
+|`POSTGRES_PASSWORD`      | `--postgres-pass`      | Password of the above-mentioned PostgreSQL user.                               |                                           |
+|`REDIS_HOST`             | `--redis-host`         | Redis host.                                                                    | 127.0.0.1                                 |
+|`REDIS_PORT`             | `--redis-port`         | Port Redis listens on.                                                         | `6379` or `16379` (in a Docker container) |
+|`REDIS_PASSWORD`         | `--redis-password`     | Redis password.                                                                |                                           |
+|`CHANNEL_NAME`           | `--channel-name`       | Redis channel name to be used for communication between the server and client. | `hubot-huntflow-reloaded`                 |
+|`TZ`                     |                        | Timezone for for scheduler **(for Docker container only)**.                    | Europe/Moscow                             |
+|`ACCESS_TOKEN_LIFETIME`  |                        | The lifetime in of the access JWT token in minutes (can be float).             | `1`                                       |
+|`REFRESH_TOKEN_LIFETIME` |                        | The lifetime in of the refresh JWT token in minutes (can be float).            | `60`                                      |
+|`SEKRET_KEY`             |                        | The string which will be used as secret for the tokens' encoding.              | secret                                    |
 
 ### How to run server for development purposes
 
@@ -184,6 +187,31 @@ You can emulate the following actions:
     Note that you need to replace the `employment_date` to the valid date in the future. 
     The server will send the reminder to the Redis channel immediately and 
     schedule the removing of the candidate instance in a day after the first working day at midnight (00:00 a.m.).
+
+- user's authorization
+    
+    ```bash
+     curl -vX POST http://127.0.0.1:8888/token -d @stubs/auth.json --header "Content-Type: application/json"
+    ```
+    It returns the valid token pair if user is registered.
+    For the details of registering a new user see the CLI [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/tree/master/cli/README.md).
+    
+- deleting interview of the specified candidate
+
+    Huntflow does not sent requests when interview is canceled, so we need an interface for deleting of the
+    interviews from huntflow-reloaded-server database. To emulate it you need to 
+    - register the user
+    - get the valid token pair (take a look at the point above)
+    - get the list of the candidates with non-expired interviews
+    - sent request for deleting the interview of the specified candidate
+    
+    ```bash
+    curl -vX POST http://127.0.0.1:8888/manage/delete -d "access=<access_token>" -d @delete_interview.json --header "Content-Type: application/json"
+    ```
+    
+    For the details check the API 
+    [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/blob/jwt-auth/docs/API_README.md)
+    and CLI [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/tree/master/cli/README.md).
 
 ### Known issues
 

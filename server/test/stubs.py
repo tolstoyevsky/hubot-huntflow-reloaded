@@ -92,3 +92,30 @@ FWD_REQUEST = """{
     }
 }
 """
+
+DELETE_REQUEST = """
+{
+    "candidate" : {
+        "first_name": "Matt",
+        "last_name": "Groening"
+    }
+}
+"""
+
+INVALID_DELETE_REQUEST = """
+{
+    "candidate" : {
+        "first_name": "Mattt",
+        "last_name": "Groening"
+    }
+}
+"""
+
+AUTH_REQUEST = """
+{
+    "user" : {
+        "email": "admin@mail.com",
+        "password": "pass"
+    }
+}
+"""

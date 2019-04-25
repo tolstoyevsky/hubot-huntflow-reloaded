@@ -21,9 +21,12 @@ import sys
 import redis
 import tornado.ioloop
 from tornado.options import define, options
+from dotenv import load_dotenv
 
 from huntflow_reloaded.scheduler import Scheduler
 from huntflow_reloaded import handler
+
+load_dotenv()
 
 LOGGER = logging.getLogger('tornado.application')
 
@@ -87,6 +90,10 @@ def main():
 
     application = tornado.web.Application([
         (r'/hf/?', handler.HuntflowWebhookHandler, app_args),
+        (r'/token', handler.TokenObtainPairHandler, {'postgres_url': postgres_url}),
+        (r'/token/refresh', handler.TokenRefreshHandler),
+        (r'/manage/list', handler.ListCandidatesHandler, {'postgres_url': postgres_url}),
+        (r'/manage/delete', handler.DeleteInterviewHandler, app_args),
     ])
     application.listen(options.port)
 

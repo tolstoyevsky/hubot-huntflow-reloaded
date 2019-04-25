@@ -5,4 +5,4 @@ if [ ! -f alembic.ini ]; then
     cd server/
 fi
 export POSTGRES_URL=${POSTGRES_URL="$1"}
-env PYTHONPATH=$(pwd) ${ALEMBIC_PATH} upgrade head
+env PYTHONPATH=$(pwd) ${ALEMBIC_PATH} upgrade heads

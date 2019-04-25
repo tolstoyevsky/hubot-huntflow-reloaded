@@ -21,9 +21,10 @@ import re
 from datetime import datetime
 
 from tornado.escape import json_decode
-from tornado.web import RequestHandler
+from tornado.web import RequestHandler, MissingArgumentError
 
 from huntflow_reloaded import models
+from .tokens import RefreshToken, AccessToken, ExpiredTokenException, InvalidTokenException
 
 class IncompleteRequest(Exception):
     """Exception raised when receiving a request of a specific type but not
@@ -301,3 +302,225 @@ def get_date_from_string(date_string):
         .replace(tzinfo=None)
 
     return data
+
+
+class TokenObtainPairHandler(RequestHandler):  # pylint: disable=abstract-method,
+    """Class implementing obtaining tokens pair. """
+
+    def __init__(self, application, request, **kwargs):
+        super(TokenObtainPairHandler, self).__init__(application, request,
+                                                     **kwargs)
+        self.user = None
+        self.valid = False
+
+    def initialize(self, postgres_url):  # pylint: disable=arguments-differ
+        self._postgres_url = postgres_url
+
+    async def post(self):  # pylint: disable=arguments-differ
+        body = self.request.body.decode('utf8')
+
+        try:
+            _decoded_body = json_decode(body)
+        except json.decoder.JSONDecodeError:
+            self.write('Could not decode request body. '
+                       'There must be valid JSON')
+            self.set_status(500)
+            return
+
+        try:
+            user = _decoded_body['user']
+            email = user['email']
+            password = user['password']
+        except KeyError:
+            self.write('Incomplete request')
+            self.set_status(500)
+            return
+
+        await self.validate(email, password)
+
+        if self.valid:
+            refresh = RefreshToken.for_user(self.user.id)
+
+            data = {
+                'access': str(refresh.access_token()), 'refresh': str(refresh)}
+        else:
+            data = {
+                'detail': 'No active account found with the given credentials',
+                'code': 'invalid_auth_creds'
+            }
+            self.set_status(400)
+
+        self.write(data)
+
+    async def validate(self, email, password):
+        """Checks if user with the given credentials exists. """
+
+        await models.gino_run(self._postgres_url)
+
+        user = await models.User.query.where(
+            models.User.email == email).gino.first()
+
+        if user and user.password == password:
+            self.user = user
+            self.valid = True
+
+
+class TokenRefreshHandler(RequestHandler):  # pylint: disable=abstract-method
+    """Class implementing handler for refreshing tokens pair request."""
+
+    async def post(self):  # pylint: disable=arguments-differ
+        try:
+            refresh = RefreshToken(self.get_argument('refresh'))
+            data = {'access': str(refresh.access_token())}
+        except ExpiredTokenException:
+            self.set_status(403)
+            data = {'detail': 'Refresh token is expired'}
+        except InvalidTokenException:
+            self.set_status(401)
+            data = {'detail': 'Refresh token is invalid'}
+        except MissingArgumentError:
+            self.set_status(401)
+            self.write({'detail': 'Refresh token is not provided'})
+
+        self.write(data)
+
+
+class ManageHandler(RequestHandler):  # pylint: disable=abstract-method,
+    """Class implementing common methods for handling /manage endpoint. """
+
+    async def _connect_to_database(self):
+        """Connecting to ORM. """
+
+        await models.gino_run(self._postgres_url)  # pylint: disable=no-member
+
+    def get_current_user(self):
+        try:
+            access_token = self.get_argument('access')
+
+        except MissingArgumentError:
+            self.write({'detail': 'Token is not provided'})
+            self.set_status(401)
+            return None
+
+        try:
+            user_id = AccessToken(access_token).payload['user_id']
+            return user_id
+        except (InvalidTokenException, KeyError):
+            self.write({'detail': 'Token is invalid'})
+            self.set_status(401)
+            return None
+
+        except ExpiredTokenException:
+            self.write({'detail': 'Token is expired'})
+            self.set_status(403)
+            return None
+
+
+class DeleteInterviewHandler(ManageHandler):  # pylint: disable=abstract-method
+    """
+    Class implementing handler for request from authorized user to delete
+    interview for specified candidate.
+    """
+
+    def __init__(self, application, request, **kwargs):
+        super(DeleteInterviewHandler, self).__init__(application, request,
+                                                     **kwargs)
+        self.token = None
+        self._decoded_body = {}
+
+    def initialize(self, postgres_url, scheduler):  # pylint: disable=arguments-differ
+        self._postgres_url = postgres_url
+        self._scheduler = scheduler
+
+    async def post(self):  # pylint: disable=arguments-differ
+        if not self.current_user:
+            return
+        body = self.request.body.decode('utf8')
+
+        try:
+            _decoded_body = json_decode(body)
+        except json.decoder.JSONDecodeError:
+            self.write('Could not decode request body. '
+                       'There must be valid JSON')
+            self.set_status(500)
+            return
+        try:
+            candidate = _decoded_body['candidate']
+            first_name = candidate['first_name']
+            last_name = candidate['last_name']
+        except KeyError:
+            self.write('Incomplete request')
+            self.set_status(500)
+            return
+
+        await self._connect_to_database()
+
+        candidate = await models.Candidate.query.where(
+            models.Candidate.first_name == first_name).where(
+                models.Candidate.last_name == last_name).gino.first()
+
+        if candidate:
+            interview = await models.Interview.query.where(
+                models.Interview.candidate == candidate.id).gino.first()
+        else:
+            data = {
+                'detail': 'Candidate with the given credentials was not found',
+                'code': 'no_candidate'}
+            self.set_status(400)
+            self.write(data)
+            return
+
+        if interview and interview.start > datetime.now():
+            if interview.jobs:
+                jobs_to_be_deleted = json_decode(interview.jobs)
+
+                for job_id in jobs_to_be_deleted:
+                    self._scheduler.remove_job(job_id)
+
+            await models.Interview.delete.where(
+                models.Interview.candidate == candidate.id).gino.status()
+        else:
+            message = {
+                'detail': 'Candidate does not have non-expired interviews',
+                'code': 'no_interview'
+            }
+            self.set_status(400)
+            self.write(message)
+            return
+
+
+class ListCandidatesHandler(ManageHandler):  # pylint: disable=abstract-method
+    """
+    Class implementing handler for request from authorized user to list the candidates
+    which have non-expired interview.
+    """
+
+    def initialize(self, postgres_url):  # pylint: disable=arguments-differ
+        self._postgres_url = postgres_url
+
+
+    async def get(self):  # pylint: disable=arguments-differ
+        if not self.current_user:
+            return
+
+        await self._connect_to_database()
+
+        all_candidates = await models.Candidate.query.gino.all()
+
+        all_candidates_names = []
+
+        for candidate in all_candidates:
+            interview = await models.Interview.query.where(
+                models.Interview.candidate == candidate.id).gino.first()
+            if interview and interview.start > datetime.now():
+                all_candidates_names.append(
+                    {'first_name': candidate.first_name,
+                     'last_name': candidate.last_name})
+
+        message = {
+            'users': all_candidates_names,
+            'total': len(all_candidates_names),
+            'success': True
+        }
+
+        self.write(message)

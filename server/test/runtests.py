@@ -15,6 +15,7 @@
 from datetime import date, timedelta, datetime
 import json
 import pickle
+import time
 
 import subprocess
 import sqlalchemy as sa  # Tests are running synchronously so we have to use sqlalchemy instead of gino.
@@ -24,7 +25,8 @@ from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application
 
 from huntflow_reloaded import handler, scheduler, models
-from huntflow_reloaded.models import Candidate, Interview
+from huntflow_reloaded.models import Candidate, Interview, User
+from huntflow_reloaded.tokens import Token
 from test import stubs
 
 
@@ -90,7 +92,7 @@ class WebTestCase(AsyncHTTPTestCase):
     def tearDown(self):
         super(WebTestCase, self).tearDown()
 
-        for table in (Interview, Candidate):
+        for table in (Interview, Candidate, User):
             self.conn.execute(table.delete)
         text = sa.sql.text('DELETE FROM apscheduler_jobs')
         self.conn.execute(text)
@@ -262,3 +264,228 @@ class HuntflowWebhookHandlerTest(WebTestCase):
 
         self.assertEqual(
             job_state.get('next_run_time').replace(tzinfo=None), exp_datetime)
+
+
+class ManageHandlerTest(WebTestCase):
+    def get_handlers(self):
+        scheduler_args = {
+            'postgres_url': POSTGRES_URL,
+            'redis_args': '',
+            'channel_name': 'stub',
+        }
+
+        self.test_scheduler = scheduler.Scheduler(**scheduler_args)
+        self.test_scheduler.make()
+
+        app_args = {
+            'postgres_url': POSTGRES_URL,
+            'scheduler': self.test_scheduler,
+        }
+
+        db_args = {'postgres_url': POSTGRES_URL}
+
+        return [
+            ('/hf', handler.HuntflowWebhookHandler, app_args),
+            (r'/token', handler.TokenObtainPairHandler, db_args),
+            (r'/token/refresh', handler.TokenRefreshHandler),
+            (r'/manage/list/', handler.ListCandidatesHandler, db_args),
+            (r'/manage/delete/', handler.DeleteInterviewHandler, app_args),
+        ]
+
+    def get_tokens(self):
+        return self.fetch('/token', body=stubs.AUTH_REQUEST, method='POST')
+
+    def send_status_request(self, body=None):
+        if not body:
+            body = compose(stubs.INTERVIEW_REQUEST)
+
+        response = self.fetch('/hf', body=body, method='POST')
+
+        self.assertEqual(response.code, 200)
+        self.assertEqual(response.body, b'')
+
+    def get_users_list(self, access_token=None):
+        if not access_token:
+            access_token = self.access_token
+
+        body = 'access=' + access_token
+        url = '/manage/list/?' + body
+
+        return self.fetch(url, method='GET')
+
+    def test_auth_of_non_existing_user(self):
+        response = self.get_tokens()
+        exp_error_message = {
+            "detail": "No active account found with the given credentials",
+            "code": "invalid_auth_creds"
+        }
+
+        self.assertEqual(response.code, 400)
+        self.assertEqual(json.loads(response.body), exp_error_message)
+
+    def test_token_handling(self):
+        # create user to login
+        text = User.insert().values(email='admin@mail.com', password='pass')
+        self.conn.execute(text)
+
+        # check if it is possible to obtain token pair
+        response = self.get_tokens()
+        self.assertEqual(response.code, 200)
+        self.assertIn('access', json.loads(response.body))
+        self.assertIn('refresh', json.loads(response.body))
+
+        refresh_token = json.loads((response.body)).get('refresh')
+        access_token = json.loads((response.body)).get('access')
+
+        # check the response in case of invalid access token
+        response = self.get_users_list(access_token=access_token + 'u')
+        exp_res = {"detail": "Token is invalid" }
+
+        self.assertEqual(response.code, 401)
+        self.assertEqual(exp_res, json.loads(response.body))
+
+        # wait until access token become expired
+        time.sleep(50)
+
+        # check if it is impossible to get data with expired token
+        response = self.get_users_list(access_token=access_token)
+        exp_res = {"detail": "Token is expired"}
+
+        self.assertEqual(response.code, 403)
+        self.assertEqual(exp_res, json.loads(response.body))
+
+        # check if it is impossible to delete interview with expired token
+        body = stubs.DELETE_REQUEST
+        url = '/manage/delete/?access=' + access_token
+        response = self.fetch(url, body=body, method='POST')
+
+        self.assertEqual(response.code, 403)
+        self.assertEqual(exp_res, json.loads(response.body))
+
+        # refresh token and check its payload
+        body = 'refresh=' + refresh_token
+        response = self.fetch('/token/refresh', body=body, method='POST')
+        self.assertEqual(response.code, 200)
+        self.assertIn('access', json.loads(response.body))
+
+        access_token = json.loads((response.body)).get('access')
+        token = Token(access_token)
+        self.assertIn('user_id', token.payload)
+
+        user_id = token.payload['user_id']
+
+        s = sa.sql.select([User]).where(User.id == user_id)
+        row = self.conn.execute(s).fetchone()
+
+        self.assertEqual(row['email'], 'admin@mail.com')
+        self.assertEqual(row['password'], 'pass')
+
+        # wait until refresh token become expired
+        time.sleep(30)
+
+        # check if it is impossible to use for refreshing the expired refresh token
+        exp_res = {"detail": "Refresh token is expired"}
+
+        response = self.fetch('/token/refresh', body=body, method='POST')
+        self.assertEqual(response.code, 403)
+        self.assertEqual(exp_res, json.loads(response.body))
+
+    def test_manage_entrypoint(self):
+        response = self.fetch('/hf', body=compose(stubs.INTERVIEW_REQUEST),
+                              method='POST')
+        self.assertEqual(response.code, 200)
+        self.assertEqual(response.body, b'')
+
+        # create user to login
+        text = User.insert().values(email='admin@mail.com', password='pass')
+        self.conn.execute(text)
+
+        # get pair of tokens
+        response = self.get_tokens()
+        self.assertEqual(response.code, 200)
+        self.assertIn('access', json.loads(response.body))
+        self.assertIn('refresh', json.loads(response.body))
+
+        self.access_token = json.loads((response.body)).get('access')
+
+        exp_list = {
+            "users": [
+                {
+                    "first_name": "Matt",
+                    "last_name": "Groening",
+                }
+            ],
+            "total": 1,
+            "success": True
+        }
+
+        response = self.get_users_list()
+        self.assertEqual(response.code, 200)
+        self.assertEqual(exp_list, json.loads(response.body))
+
+        body = stubs.DELETE_REQUEST
+        url = '/manage/delete/?access=' + self.access_token
+
+        response = self.fetch(url, body=body, method='POST')
+        self.assertEqual(response.code, 200)
+
+        text = sa.sql.text(
+            'SELECT job_state FROM apscheduler_jobs ORDER BY next_run_time')
+        result = self.conn.execute(text).fetchall()
+
+        self.assertFalse(result)
+
+        s = sa.sql.select([Interview]).where(Interview.candidate == 1)
+        interview = self.conn.execute(s).fetchall()
+
+        self.assertFalse(interview)
+
+    def test_invalid_deleting_of_interview(self):
+        body = compose(stubs.INTERVIEW_REQUEST, count=-2)
+        self.send_status_request(body=body)
+
+        text = User.insert().values(email='admin@mail.com', password='pass')
+        self.conn.execute(text)
+
+        # get pair of tokens
+        response = self.get_tokens()
+        self.assertEqual(response.code, 200)
+        self.assertIn('access', json.loads(response.body))
+        self.assertIn('refresh', json.loads(response.body))
+
+        access_token = json.loads((response.body)).get('access')
+
+        body = stubs.INVALID_DELETE_REQUEST
+        url = '/manage/delete/?access=' + access_token
+        response = self.fetch(url, body=body, method='POST')
+
+        exp_res = {
+            "detail": "Candidate with the given credentials was not found",
+            "code": "no_candidate"
+        }
+
+        self.assertEqual(response.code, 400)
+        self.assertEqual(json.loads(response.body), exp_res)
+
+        url = '/manage/delete/?access=' + access_token
+        response = self.fetch(url, body=stubs.DELETE_REQUEST, method='POST')
+
+        exp_res = {
+            "detail": "Candidate does not have non-expired interviews",
+            "code": "no_interview"
+        }
+
+        self.assertEqual(response.code, 400)
+        self.assertEqual(json.loads(response.body), exp_res)
+
+    def test_missing_token(self):
+        exp_res = {"detail": "Token is not provided"}
+
+        response = self.fetch('/manage/list/', method='GET')
+        self.assertEqual(response.code, 401)
+        self.assertEqual(json.loads(response.body), exp_res)
+
+        response = self.fetch(
+            '/manage/delete/', body=stubs.DELETE_REQUEST, method='POST')
+        self.assertEqual(response.code, 401)
+        self.assertEqual(json.loads(response.body), exp_res)
