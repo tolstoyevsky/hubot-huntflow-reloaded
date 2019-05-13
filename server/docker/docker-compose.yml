@@ -4,6 +4,7 @@ services:
     image: huntflow-reloaded-server
     network_mode: "host"
     environment:
+    - CHANNEL_NAME=${CHANNEL_NAME}
     - LOGLEVEL=${LOGLEVEL}
     - LOG_FILE=${LOG_FILE}
     - POSTGRES_DBNAME=${POSTGRES_DBNAME}

@@ -15,6 +15,8 @@
 
 set -x
 
+CHANNEL_NAME=${CHANNEL_NAME:="hubot-huntflow-reloaded"}
+
 LOGLEVEL=${LOGLEVEL:="info"}
 
 LOG_FILE=${LOG_FILE:="/var/log/huntflow-reloaded-server.log"}
@@ -67,17 +69,19 @@ fi
 
 args=()
 
+args+=( --channel-name="${CHANNEL_NAME}")
+
 args+=( --logging="${LOGLEVEL}" )
 
-args+=( --postgres_dbname="${POSTGRES_DBNAME}" )
+args+=( --postgres-dbname="${POSTGRES_DBNAME}" )
 
-args+=( --postgres_host="${POSTGRES_HOST}" )
+args+=( --postgres-host="${POSTGRES_HOST}" )
 
-args+=( --postgres_pass="${POSTGRES_PASSWORD}" )
+args+=( --postgres-pass="${POSTGRES_PASSWORD}" )
 
-args+=( --postgres_port="${POSTGRES_PORT}" )
+args+=( --postgres-port="${POSTGRES_PORT}" )
 
-args+=( --postgres_user="${POSTGRES_USER}" )
+args+=( --postgres-user="${POSTGRES_USER}" )
 
 args+=( --redis-host="${REDIS_HOST}" )
 
