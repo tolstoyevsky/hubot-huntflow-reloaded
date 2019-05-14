@@ -1,10 +1,33 @@
 const moment = require('moment')
 
+// init exports instance
+const exp = module.exports = {}
+
+// env consts
+exp.BASE_SERVER_URL = process.env.BASE_SERVER_URL || 'http://127.0.0.1:8888'
+exp.SERVER_USER_EMAIL = process.env.SERVER_USER_EMAIL
+exp.SERVER_USER_PASSWORD = process.env.SERVER_USER_PASSWORD
+
+// messages constants
+exp.MSG_PERMISSION_DENIED = 'У тебя недостаточно прав для этой команды :rolling_eyes:'
+exp.MSG_NOT_ANY_SCHEDULED_INTERVIEWS = 'Запланированных интервью нет.'
+exp.MSG_ERROR_TRY_AGAIN = 'Произошла ошибка, попробуйте еще раз.'
+exp.MSG_SUCCESSFULLY_DELETED = 'Успешно удалено.'
+exp.MSG_AUTHORIZATION_DATA_NEEDED = 'SERVER_USER_EMAIL and SERVER_USER_PASSWORD ' +
+  'are mandatory parameters, however they\'re not specified.'
+exp.MSG_CHOOSE_CANDIDATE = 'Выберите одного из кандидатов, чтобы удалить интервью:'
+
+exp.ERROR_MSGS_FROM_SERVER = {
+  'invalid_auth_creds': 'Авторизация не удалась, обратитесь к администратору Rocket.Chat.',
+  'no_candidate': 'Кандидат с такими данными не был найден.',
+  'no_interview': 'У данного кандидата нет запланированного интервью.'
+}
+
 /**
  * @param {InterviewEvent} json
  * @returns {string}
  */
-function makeMessageFromEventJSON (json) {
+const makeMessageFromEventJSON = (json) => {
   const time = moment(json.start).format('HH:mm')
   let message = `${time} - ${json.first_name} ${json.last_name}`
 
@@ -19,7 +42,7 @@ function makeMessageFromEventJSON (json) {
  * @param {Array<InterviewEvent>} data
  * @returns {string}
  */
-function buildReport (data) {
+exp.buildReport = (data) => {
   const body = {
     'через час': [],
     'сегодня': [],
@@ -87,5 +110,3 @@ function buildReport (data) {
 
   return report.trim()
 }
-
-module.exports = { buildReport, makeMessageFromEventJSON }
