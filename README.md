@@ -13,6 +13,9 @@ The project is split into two parts: server and client. The server side is a [Hu
 - [Server](#server)
   - [Installation](#installation-1)
   - [Configuration](#configuration-1)
+  - [How to run server for development](#how-to-run-server-for-development)
+  - [How to use stubs](#how-to-use-stubs)
+  - [Known issues](#known-issues)
 - [Authors](#authors)
 - [Licensing](#licensing)
 
@@ -98,6 +101,100 @@ The server can be configured via the following command line options or environme
 |`REDIS_PASSWORD`       | `--redis-password`     | Redis password.                                                                |                                           |
 |`CHANNEL_NAME`         | `--channel-name`       | Redis channel name to be used for communication between the server and client. | `hubot-huntflow-reloaded`                 |
 |`TZ`                   |                        | Timezone for for scheduler **(for Docker container only)**.                    | Europe/Moscow                             |
+
+### How to run server for development purposes
+
+1. Create a virtual environment and install the required packages in it.
+    ```bash
+    virtualenv -p python3 hubot-huntflow-reloaded-env
+    source hubot-huntflow-reloaded-env/bin/activate
+    cd hubot-huntflow-reloaded
+    pip install -r server/requirements.txt
+    ```
+
+2. To start work with the huntflow-reloaded server you need to setup the PostgreSQL database and apply the migrations. 
+    The easiest way to do it is to specify the required param `POSTGRES_PASSWORD`, run
+    ```bash
+    cd server/docker/
+    docker-compose up
+    ```
+    and then stop it by pressing Ctrl-C. It automatically prepares the database to be used later.
+    
+    Notice, that `docker-compose` runs three containers and if something goes wrong you need to look at `huntflow-reloaded-server` logs first of all to get to the bottom of the problem.
+    
+3. Deploy the Rocket.Chat server locally and run Hubot. For the details see Rocket.Chat [README](https://github.com/tolstoyevsky/mmb/tree/master/rocketchat), Rocket.Chat Hubot adapter [README](https://github.com/tolstoyevsky/mmb/tree/master/hubot-rocketchat) and [client configuration](#configuration) section.
+    The Hubot runs also the Redis server. If you don't need the client run the Redis server manually.
+    
+    ```bash
+    docker-compose up redis
+    ```
+    Also to debug you can subscribe to the Redis channel to see the reminders as a client would receive. 
+    Find the name of the Redis container in the output of the command,
+    ```
+    docker ps
+    ```
+    start the Bash session in the running container via
+    ```
+    docker exec -it container_name bash
+    ```
+     and subscribe to the Redis channel.
+    ```bash
+    redis-cli -h 127.0.0.1 -p 16379 
+    SUBSCRIBE hubot-huntflow-reloaded
+    ```
+    Notice, that if you change the default settings you need to use them.
+
+4. Run PostgreSQL server
+    ```bash
+    docker-compose up postgres-hf
+    ```
+
+5. Run huntflow-reloaded-server
+    ```bash
+    cd ..
+    env PYTHONPATH=$(pwd) python3 bin/server.py --redis-port=16379
+    ```
+    Now server is ready to accept connections.
+
+### How to use stubs
+
+The json files in stubs directory mock the requests which huntflow-reloaded-server is able to handle. 
+There are the Huntflow webhooks and client requests. You can send these files via `curl` command to the server to emulate the real requests.
+You can emulate the following actions:
+- setting the interview
+
+    ```bash
+    curl -vX POST http://127.0.0.1:8888/hf -d @stubs/interview.json --header "Content-Type: application/json" 
+    ```
+  
+    Note that if you want to test the scheduler you need to change the `start_date` inside `interview.json` to be the valid date in the future.
+    Server will send the reminder to the Redis channel immediately and schedule the sending of reminders at 6 p.m. 
+    before the event day, at 7 a.m. in the event day and an hour in advance.
+
+- resetting the interview
+
+    Send the same request as above but change the `start_date`. The reminders will be rescheduled.
+
+- setting the first working day
+
+    ```bash
+    curl -vX POST http://127.0.0.1:8888/hf -d @stubs/fwd.json --header "Content-Type: application/json"
+    ```
+  
+    Note that you need to replace the `employment_date` to the valid date in the future. 
+    The server will send the reminder to the Redis channel immediately and 
+    schedule the removing of the candidate instance in a day after the first working day at midnight (00:00 a.m.).
+
+### Known issues
+
+If you use macOS you need to modify the configuration specified in `docker-compose.yml`.
+
+Remove `network_mode: "host"` and instead specify the ports PostgreSQL and Redis listen on the following way
+```
+ports:
+    - "5432:5432"
+```
+Also, see the Rocket.Chat Hubot adapter [README](https://github.com/tolstoyevsky/mmb/tree/master/hubot-rocketchat#known-issues) for details how to run it on macOS.
 
 ## Authors
 
