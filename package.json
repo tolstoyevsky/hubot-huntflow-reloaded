@@ -18,8 +18,10 @@
     "url": "https://github.com/tolstoyevsky/hubot-huntflow-reloaded/issues"
   },
   "dependencies": {
+    "axios": "^0.18.0",
     "hubot-routines": "https://github.com/tolstoyevsky/hubot-routines.git",
     "ioredis": "^4.0.5",
+    "jwt-decode": "^2.2.0",
     "moment": "^2.22.2"
   },
   "devDependencies": {

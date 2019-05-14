@@ -23,6 +23,7 @@ The project is split into two parts: server and client. The server side is a [Hu
 
 * The bot must be in the channel specified via the `HUNTFLOW_REMINDER_CHANNEL` environment variable.
 * There must be specified the `POSTGRES_PASSWORD` environment variable (see the [configuration section](#configuration-1) for details).
+* There must be specified `SERVER_USER_EMAIL` and `SERVER_USER_PASSWORD`(see the [configuration section](#configuration) for details). 
 
 ## Client
 
@@ -51,6 +52,9 @@ Then add **hubot-huntflow-reloaded** to your `external-scripts.json`:
 |`REDIS_PORT`                | Port Redis listens on.                                                                        | 16379                     |
 |`REDIS_PASSWORD`            | Specifies the Redis password.                                                                 | null                      |
 |`REDIS_CHANNEL`             | Defines the name of Redis channel to get messages from the server.                            | `hubot-huntflow-reloaded` |
+|`BASE_SERVER_URL`           | Defines the server url to handle requests.                                                    | `http://127.0.0.1:8888/`  |
+|`SERVER_USER_EMAIL`         | Defines the server user email to make authorized requests.                                    | null                      |
+|`SERVER_USER_PASSWORD`      | Defines the server user password to make authorized requests.                                 | null                      |
 
 ## Server
 
