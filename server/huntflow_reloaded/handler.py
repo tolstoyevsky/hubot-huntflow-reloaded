@@ -193,7 +193,7 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         await self._scheduler.create_event(self.event_type,
                                            context=self.context)
 
-    async def handle_calendar_event(self):
+    async def handle_calendar_event(self):  # pylint: disable=too-many-locals
         """Handles the setting and rescheduling of the interview. """
 
         calendar_event = self.event['calendar_event']
@@ -256,7 +256,10 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
             "start": start,
         }
 
-        self.context = {"message": self.message,
+        message_to_be_scheduled = self.message.copy()
+        message_to_be_scheduled["type"] = "interview"
+
+        self.context = {"message": message_to_be_scheduled,
                         "interview": interview}
 
     async def handle_employment_date(self):
