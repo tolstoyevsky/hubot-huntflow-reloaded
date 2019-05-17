@@ -100,9 +100,6 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
         self._redis_conn = redis_conn
         self._postgres_data = postgres
         self._logger = logger
-        handler = AsyncFileHandler(
-            filename='/var/log/huntflow-reloaded-server.log')
-        self._logger.addHandler(handler)
 
     def _classify_request(self):
         try:
@@ -150,27 +147,27 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
         try:
             self._classify_request()
         except UndefinedType:
-            await self._logger.debug(body)
+            await self._logger.emit(body)
             self.write('Undefined type')
             self.set_status(500)
             return
         except UnknownType:
-            await self._logger.debug(body)
+            await self._logger.emit(body)
             self.write('Unknown type')
             self.set_status(500)
             return
 
-        await self._logger.debug(self._decoded_body)
+        await self._logger.emit(self._decoded_body)
 
         try:
             await self._handlers[self._req_type]()
         except IncompleteRequest:
-            await self._logger.debug(body)
+            await self._logger.emit(body)
             self.write('Incomplete request')
             self.set_status(500)
             return
 
-        await self._logger.debug(body)
+        await self._logger.emit(body)
 
     #
     # Handlers
@@ -178,11 +175,11 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
 
     async def add_type_handler(self):
         """Invokes when a request of the 'ADD' type is received. """
-        await self._logger.info("Handling 'add' request")
+        await self._logger.emit("Handling 'add' request")
 
     async def removed_type_handler(self):
         """Invokes when a request of the 'REMOVED' type is received. """
-        await self._logger.info("Handling 'removed' request")
+        await self._logger.emit("Handling 'removed' request")
 
     async def status_type_handler(self):
         """Invokes when a request of the 'STATUS' type is received:
@@ -191,7 +188,7 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
         * setting the first working day.
         """
 
-        await self._logger.info("Handling 'status' request")
+        await self._logger.emit("Handling 'status' request")
 
         self.event = self._decoded_body['event']
 
@@ -310,7 +307,7 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
         """Invokes when a type is registered but there is no handler defined
         which is responsible for dealing with the requests of the type.
         """
-        self._logger.info('Invoking the stub handler to serve the request of '
+        self._logger.emit('Invoking the stub handler to serve the request of '
                           'the type %s', self._req_type)
 
 

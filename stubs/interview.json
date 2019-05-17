@@ -7,12 +7,12 @@
         "created": "%CREATED_DATE%",
         "type": "STATUS",
         "applicant": {
-            "id": 1,
-            "first_name": "Matt",
-            "last_name": "Groening"
+            "id": 4,
+            "first_name": "Andrej",
+            "last_name": "Proening"
         },
         "calendar_event": {
-            "start": "1989-12-17T00:00:00+03:00",
+            "start": "2019-05-15T17:59:00+03:00",
             "end": "1989-12-17T01:00:00+03:00"
         }
     }
