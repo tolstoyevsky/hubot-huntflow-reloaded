@@ -1,47 +1,86 @@
-# Utility for managing of users
+## CLI Docs
 
-Commands:
-* Create
-* Delete
-* list
+Command line utility for managing users. 
 
-Usage:
+### Table of Contents
+- [Configuration](#configuration)
+- [Interface for registering users](#interface-for-registering-users)
+- [Interface for resending password](#interface-for-resending-password)
+- [Interface for listing users](#interface-for-listing-users)
+- [Interface for deleting users](#interface-for-deleting-users)
 
+### Configuration
+
+| Environment variables | Command line options   | Description                                         | Default             |
+|-----------------------|------------------------|-----------------------------------------------------|---------------------|
+|`POSTGRES_DBNAME`      | `--postgres-dbname`    | Database name.                                      | `huntflow-reloaded` |
+|`POSTGRES_HOST`        | `--postgres-host`      | PostgreSQL host.                                    | 127.0.0.1           |
+|`POSTGRES_PORT`        | `--postgres-port`      | Port PostgreSQL listens on.                         | `5432`              |
+|`POSTGRES_USER`        | `--postgres-user`      | PostgreSQL user name.                               | postgres            |
+|`POSTGRES_PASSWORD`    | `--postgres-pass`      | Password of the above-mentioned PostgreSQL user.    |                     |
+|`SMTP_SERVER`          |                        | SMTP server address.                                |                     | 
+|`SMTP_PORT`            |                        | SMTP port server listens on.                        |                     |
+|`SENDER_EMAIL`         |                        | Sender email address.                               |                     |
+|`SENDER_PASSWORD`      |                        | Sender email password.                              |                     |
+
+Note, that these params should match the PostgreSQL params you will run server with.
+
+### Interface for registering users
+Registering a new user with the unique email. The password will be generated and credentials will be send to the user's email.
+
+| Command line options   | Description                                                                   | Default  |
+|------------------------|-------------------------------------------------------------------------------|----------|
+| `-e`, `--email`        | Unique email address to register new user with. It is the required parameter. |          |
+| `-l`, `--pass-len`     | The length of the password which will be automatically generated.             | 8        |
+| `-s`, `--send-email`   | If specified the credentials will be sent to the user's email.                |          |
+| `-c`, `--count-resend` | Number of attempts to send the credentials to the user's email.               | 5        |
+
+Sample Call:
+
+```bash
+env PYTHONPATH=$(pwd) python cli/manager.py create -e user_email@domain.com -s
 ```
-manager.py [-h] [--postgres-pass POSTGRES_PASS]
-                [--postgres-user POSTGRES_USER]
-                [--postgres-host POSTGRES_HOST]
-                [--postgres-port POSTGRES_PORT]
-                {create,delete,list} ...
 
-positional arguments:
-  {create,delete,list}  commands
-    create              create the user instance
-    delete              delete the user instance
-    list                print the list of users
+Success Response:
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --postgres-pass POSTGRES_PASS
-                        PostgreSQL user password
-  --postgres-user POSTGRES_USER
-                        PostgreSQL user name
-  --postgres-host POSTGRES_HOST
-                        PostgreSQL host
-  --postgres-port POSTGRES_PORT
-                        PostgreSQL port
-```
-
-Example of usage:
-```
->>> env PYTHONPATH=$(pwd) python CLI/manager.py create -e test@test.com -l 5 -s
+```bash
 User created successfully!
-Message sent successfully!
->>> env PYTHONPATH=$(pwd) python CLI/manager.py list
-login: test@test.com; password: RtOhb
->>>env PYTHONPATH=$(pwd) python CLI/manager.py delete -e test@test.com;
+Message was sent successfully!
+```
+
+### Interface for resending password
+
+Resending the credentials to the user's email.
+
+Sample Call:
+
+```bash
+env PYTHONPATH=$(pwd) python cli/manager.py resend -e user_email@domain.com
+```
+Success Response:
+
+```bash
+Message was sent successfully!
+```
+
+### Interface for listing users
+Listing all users' emails.
+
+Sample Call:
+
+```bash
+env PYTHONPATH=$(pwd) python cli/manager.py list
+```
+
+### Interface for deleting users
+
+Sample Call:
+
+```bash
+env PYTHONPATH=$(pwd) python cli/manager.py delete -e user_email@domain.com
+```
+Success Response:
+
+```bash
 User deleted successfully!
->>> env PYTHONPATH=$(pwd) python CLI/manager.py list
-
-
 ```

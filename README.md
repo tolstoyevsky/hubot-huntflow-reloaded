@@ -108,6 +108,10 @@ The server can be configured via the following command line options or environme
 |`ACCESS_TOKEN_LIFETIME`  |                        | The lifetime in of the access JWT token in minutes (can be float).             | `1`                                       |
 |`REFRESH_TOKEN_LIFETIME` |                        | The lifetime in of the refresh JWT token in minutes (can be float).            | `60`                                      |
 |`SEKRET_KEY`             |                        | The string which will be used as secret for the tokens' encoding.              | secret                                    |
+|`SMTP_SERVER`            |                        | SMTP server address.                                                           |                                           | 
+|`SMTP_PORT`              |                        | SMTP port server listens on.                                                   |                                           |
+|`SENDER_EMAIL`           |                        | Sender email address.                                                          |                                           |
+|`SENDER_PASSWORD`        |                        | Sender email password.                                                         |                                           |
 
 ### How to run server for development purposes
 
