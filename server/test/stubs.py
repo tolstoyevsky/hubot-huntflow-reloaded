@@ -93,7 +93,7 @@ FWD_REQUEST = """{
 }
 """
 
-DELETE_REQUEST = """
+CANDIDATE_REQUEST = """
 {
     "candidate" : {
         "first_name": "Matt",
@@ -102,7 +102,7 @@ DELETE_REQUEST = """
 }
 """
 
-INVALID_DELETE_REQUEST = """
+INVALID_CANDIDATE_REQUEST = """
 {
     "candidate" : {
         "first_name": "Mattt",

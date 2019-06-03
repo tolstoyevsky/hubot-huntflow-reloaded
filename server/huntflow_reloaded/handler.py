@@ -271,6 +271,15 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         except KeyError:
             raise IncompleteRequest
 
+        _id = self.basic_attrs['_id']
+
+        candidate = await models.Candidate.query.where(
+            models.Candidate.id == _id).gino.first()
+
+        date_from_string = datetime.strptime(employment_date, "%Y-%m-%d").date()
+
+        await candidate.update(first_working_day=date_from_string).apply()
+
         self.event_type = 'remove_candidate'
 
         self.message = {
@@ -281,7 +290,7 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         }
 
         self.context = {'employment_date': employment_date,
-                        'candidate_id': self.basic_attrs['_id']}
+                        'candidate_id': _id}
 
     async def stub_handler(self):
         """Invokes when a type is registered but there is no handler defined
@@ -524,3 +533,91 @@ class ListCandidatesHandler(ManageHandler):  # pylint: disable=abstract-method
         }
 
         self.write(message)
+
+
+class ListCandidatesWithFwdHandler(ManageHandler):  # pylint: disable=abstract-method
+    """
+    Class implementing handler for request from authorized user to list the candidates
+    which have first working day attribute.
+    """
+
+    def initialize(self, postgres_url):  # pylint: disable=arguments-differ
+        self._postgres_url = postgres_url
+
+    async def get(self):  # pylint: disable=arguments-differ
+        if not self.current_user:
+            return
+
+        await self._connect_to_database()
+
+        all_candidates = await models.Candidate.query.gino.all()
+
+        candidates_with_fwd = []
+
+        for candidate in all_candidates:
+            if candidate.first_working_day:
+                candidates_with_fwd.append(
+                    {'first_name': candidate.first_name,
+                     'last_name': candidate.last_name}
+                )
+
+        message = {
+            'users': candidates_with_fwd,
+            'total': len(candidates_with_fwd),
+            'success': True
+        }
+
+        self.write(message)
+
+
+class ShowFwdHandler(ManageHandler):  # pylint: disable=abstract-method
+    """
+    Class implementing handler for request from authorized user to get the
+    first working day for the specified candidate.
+    """
+
+    def initialize(self, postgres_url):  # pylint: disable=arguments-differ
+        self._postgres_url = postgres_url
+
+    async def get(self):  # pylint: disable=arguments-differ
+        if not self.current_user:
+            return
+
+        try:
+            first_name = self.get_argument('first_name')
+            last_name = self.get_argument('last_name')
+        except MissingArgumentError as err:
+            data = {
+                'detail': 'Missing parameter "{}"'.format(err.arg_name),
+                'code': 'missing_parameter'
+            }
+            self.set_status(400)
+            self.write(data)
+            return
+
+        await self._connect_to_database()
+
+        candidate = await models.Candidate.query.where(
+            models.Candidate.first_name == first_name).where(
+                models.Candidate.last_name == last_name).gino.first()
+
+        if candidate:
+            if candidate.first_working_day:
+                message = {
+                    'candidate': {'first_name': candidate.first_name,
+                                  'last_name': candidate.last_name,
+                                  'fwd': candidate.first_working_day.isoformat()}
+                }
+                self.write(message)
+            else:
+                data = {
+                    'detail': 'First working day of specified candidate was not found',
+                    'code': 'no_fwd'}
+                self.set_status(400)
+                self.write(data)
+        else:
+            data = {
+                'detail': 'Candidate with the given credentials was not found',
+                'code': 'no_candidate'}
+            self.set_status(400)
+            self.write(data)

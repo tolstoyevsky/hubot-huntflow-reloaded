@@ -80,6 +80,15 @@ class WebTestCase(AsyncHTTPTestCase):
         engine = sa.create_engine(POSTGRES_URL)
         self.conn = engine.connect()
 
+        scheduler_args = {
+                        'postgres_url': POSTGRES_URL,
+                        'redis_args': '',
+                        'channel_name': 'stub',
+                    }
+
+        self.test_scheduler = scheduler.Scheduler(**scheduler_args)
+        self.test_scheduler.make()
+
     def get_handlers(self):
         raise NotImplementedError()
 
@@ -159,7 +168,7 @@ class HuntflowWebhookHandlerTest(WebTestCase):
 
         event = json.loads(body)['event']
         exp_candidate = event['applicant']
-        exp_row = (exp_candidate['id'], exp_candidate['first_name'], exp_candidate['last_name'])
+        exp_row = (exp_candidate['id'], exp_candidate['first_name'], exp_candidate['last_name'], None)
         self.assertEqual(row, exp_row)
 
         calendar_event = event['calendar_event']
@@ -355,7 +364,7 @@ class ManageHandlerTest(WebTestCase):
         self.assertEqual(exp_res, json.loads(response.body))
 
         # check if it is impossible to delete interview with expired token
-        body = stubs.DELETE_REQUEST
+        body = stubs.CANDIDATE_REQUEST
         url = '/manage/delete/?access=' + access_token
         response = self.fetch(url, body=body, method='POST')
 
@@ -423,7 +432,7 @@ class ManageHandlerTest(WebTestCase):
         self.assertEqual(response.code, 200)
         self.assertEqual(exp_list, json.loads(response.body))
 
-        body = stubs.DELETE_REQUEST
+        body = stubs.CANDIDATE_REQUEST
         url = '/manage/delete/?access=' + self.access_token
 
         response = self.fetch(url, body=body, method='POST')
@@ -455,7 +464,7 @@ class ManageHandlerTest(WebTestCase):
 
         access_token = json.loads((response.body)).get('access')
 
-        body = stubs.INVALID_DELETE_REQUEST
+        body = stubs.INVALID_CANDIDATE_REQUEST
         url = '/manage/delete/?access=' + access_token
         response = self.fetch(url, body=body, method='POST')
 
@@ -468,7 +477,7 @@ class ManageHandlerTest(WebTestCase):
         self.assertEqual(json.loads(response.body), exp_res)
 
         url = '/manage/delete/?access=' + access_token
-        response = self.fetch(url, body=stubs.DELETE_REQUEST, method='POST')
+        response = self.fetch(url, body=stubs.CANDIDATE_REQUEST, method='POST')
 
         exp_res = {
             "detail": "Candidate does not have non-expired interviews",
@@ -486,6 +495,155 @@ class ManageHandlerTest(WebTestCase):
         self.assertEqual(json.loads(response.body), exp_res)
 
         response = self.fetch(
-            '/manage/delete/', body=stubs.DELETE_REQUEST, method='POST')
+            '/manage/delete/', body=stubs.CANDIDATE_REQUEST, method='POST')
         self.assertEqual(response.code, 401)
+        self.assertEqual(json.loads(response.body), exp_res)
+
+
+class ManageFwdHandlerTest(WebTestCase):
+    def get_handlers(self):
+        scheduler_args = {
+                        'postgres_url': POSTGRES_URL,
+                        'redis_args': '',
+                        'channel_name': 'stub',
+                    }
+        self.test_scheduler = scheduler.Scheduler(**scheduler_args)
+        self.test_scheduler.make()
+
+        scheduler_args = {
+            'postgres_url': POSTGRES_URL,
+            'redis_args': '',
+            'channel_name': 'stub',
+        }
+
+        self.test_scheduler = scheduler.Scheduler(**scheduler_args)
+        self.test_scheduler.make()
+
+        app_args = {
+            'postgres_url': POSTGRES_URL,
+            'scheduler': self.test_scheduler,
+        }
+
+        db_args = {'postgres_url': POSTGRES_URL}
+
+        return [
+            ('/hf', handler.HuntflowWebhookHandler, app_args),
+            (r'/token', handler.TokenObtainPairHandler, db_args),
+            (r'/token/refresh', handler.TokenRefreshHandler),
+            (r'/manage/fwd_list/', handler.ListCandidatesWithFwdHandler, db_args),
+            (r'/manage/fwd/', handler.ShowFwdHandler, db_args),
+        ]
+
+    def get_tokens(self):
+        return self.fetch('/token', body=stubs.AUTH_REQUEST, method='POST')
+
+    def send_status_request(self, body=None):
+        if not body:
+            body = compose(stubs.INTERVIEW_REQUEST)
+
+        response = self.fetch('/hf', body=body, method='POST')
+
+        self.assertEqual(response.code, 200)
+        self.assertEqual(response.body, b'')
+
+    def get_fwd_users_list(self, access_token=None):
+        if not access_token:
+            access_token = self.access_token
+
+        body = 'access=' + access_token
+        url = '/manage/fwd_list/?' + body
+
+        return self.fetch(url, method='GET')
+
+    def test_fwd_calls(self):
+        self.send_status_request()
+
+        body = compose(stubs.FWD_REQUEST)
+        response = self.fetch('/hf', body=body, method='POST')
+        self.assertEqual(response.code, 200)
+        self.assertEqual(response.body, b'')
+
+        # create user to login
+        text = User.insert().values(email='admin@mail.com', password='pass')
+        self.conn.execute(text)
+
+        # get pair of tokens
+        response = self.get_tokens()
+        self.assertEqual(response.code, 200)
+        self.assertIn('access', json.loads(response.body))
+        self.assertIn('refresh', json.loads(response.body))
+
+        self.access_token = json.loads((response.body)).get('access')
+
+        exp_list = {
+            "users": [
+                {
+                    "first_name": "Matt",
+                    "last_name": "Groening"
+                }
+            ],
+            "total": 1,
+            "success": True
+        }
+
+        response = self.get_fwd_users_list()
+        self.assertEqual(response.code, 200)
+        self.assertEqual(exp_list, json.loads(response.body))
+
+        body = json.loads(stubs.CANDIDATE_REQUEST)['candidate']
+        url = ('/manage/fwd/?first_name={}&last_name={}&access={}'
+                .format(body['first_name'], body['last_name'], self.access_token))
+
+        exp_res = {
+            "candidate" : {
+                "first_name": "Matt",
+                "last_name": "Groening",
+                "fwd": date.today().isoformat()
+            }
+        }
+
+        response = self.fetch(url, method='GET', allow_nonstandard_methods=True)
+        self.assertEqual(response.code, 200)
+        self.assertEqual(json.loads(response.body), exp_res)
+
+    def test_invalid_fwd_calls(self):
+        # create user to login
+        text = User.insert().values(email='admin@mail.com', password='pass')
+        self.conn.execute(text)
+
+        # get pair of tokens
+        response = self.get_tokens()
+        self.assertEqual(response.code, 200)
+        self.assertIn('access', json.loads(response.body))
+        self.assertIn('refresh', json.loads(response.body))
+
+        self.access_token = json.loads((response.body)).get('access')
+
+        # try to get fwd for invalid candidate
+        body = json.loads(stubs.INVALID_CANDIDATE_REQUEST)['candidate']
+        url = ('/manage/fwd/?first_name={}&last_name={}&access={}'
+                .format(body['first_name'], body['last_name'], self.access_token))
+
+        response = self.fetch(url, method='GET',
+                              allow_nonstandard_methods=True)
+        exp_res = {
+            'detail': 'Candidate with the given credentials was not found',
+            'code': 'no_candidate'}
+
+        self.assertEqual(response.code, 400)
+        self.assertEqual(json.loads(response.body), exp_res)
+
+        # try to get fwd for candidate without relevant attribute
+        self.send_status_request()
+
+        body = json.loads(stubs.CANDIDATE_REQUEST)['candidate']
+        url = ('/manage/fwd/?first_name={}&last_name={}&access={}'
+                .format(body['first_name'], body['last_name'], self.access_token))
+        response = self.fetch(url, method='GET',
+                              allow_nonstandard_methods=True)
+        exp_res = {
+            'detail': 'First working day of specified candidate was not found',
+            'code': 'no_fwd'}
+
+        self.assertEqual(response.code, 400)
         self.assertEqual(json.loads(response.body), exp_res)

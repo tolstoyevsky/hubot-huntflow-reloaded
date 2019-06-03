@@ -6,7 +6,9 @@ The REST API allowing to retrieve and change data at huntflow-reloaded-server fr
 
 - [Interface to sign in](#interface-to-sign-in)
 - [Interface for refreshing an access token](#interface-for-refreshing-an-access-token)
-- [Interface for getting a list of candidates](#interface-for-getting-a-list-of-candidates-who-have-non-expired-interviews)
+- [Interface for getting a list of candidates with non-expired interviews](#interface-for-getting-a-list-of-candidates-who-have-non-expired-interviews)
+- [Interface for getting a list of candidates with fwd attribute](#interface-for-getting-a-list-of-candidates-with-first-working-day-attribute)
+- [Interface for getting first working day for the specified candidate](#interface-for-getting-first-working-day-for-the-specified-candidate)
 - [Interface for deleting an interview](#interface-for-deleting-a-non-expired-interview-for-the-specified-candidate)
 - [Common Authorization Error Responses](#common-authorization-error-responses)
 
@@ -116,6 +118,80 @@ Sample Call:
 $ curl -X GET http://127.0.0.1:8888/manage/list -d "access=<access_token>"
 ```
 
+### Interface for getting a list of candidates with first working day attribute
+
+| URI                   | Method | Authorization |
+|-----------------------|--------|---------------|
+|  `/manage/fwd_list`   | `GET`  | required      |
+
+Param: `"access": [string]`, where access is users access token token.
+
+Success Response:
+* Code: 200
+* Content:
+```
+{
+    "users": [
+    {
+        "first_name": [string],
+        "last_name": [string]
+    },
+    {
+    ...
+    }
+    ],
+    "total": [number],
+    "success": True
+}
+```
+
+Sample Call:
+
+```bash
+$ curl -X GET http://127.0.0.1:8888/manage/fwd_list -d "access=<access_token>"
+```
+
+### Interface for getting first working day for the specified candidate
+
+| URI               | Method | Authorization |
+|-------------------|--------|---------------|
+| `/manage/fwd`     | `GET`  | required      |
+
+Param: query data with: `"access": [string]` where `access` is the access token, `"first_name": [string]` where `first_name` is the first name of candidate, `"last_name": [string]` where `last_name` is the last name of candidate.
+
+Success Response:
+* Code: 200
+* Content:
+```
+"candidate" : {
+    "first_name": [string],
+    "last_name": [string],
+    "fwd": [string]
+}
+```
+
+Specific Error Responses:
+
+* Code: 400
+* Content:
+    - `{"detail": "Candidate with the given credentials was not found", "code": "no_candidate"}` 
+    - `{"detail": "First working day of specified candidate was not found", "code"": "no_fwd"}` 
+    - `{"detail": "Missing parameter paramName", "code": "missing_parameter"}`
+----
+
+* Code: 400
+* Content:
+
+    - `Could not decode request body. There must be valid JSON`
+    - `Incomplete request`
+
+
+Sample Call:
+
+```bash
+$ curl -X GET http://127.0.0.1:8888/manage/fwd -d "access=<access_token>" -d "first_name=<first_name>" -d "last_name=<last_name>"
+```
+
 ### Interface for deleting a non-expired interview for the specified candidate
 
 | URI               | Method | Authorization |
@@ -152,7 +228,7 @@ Specific Error Responses:
 Sample Call:
 
 ```bash
-$ curl -X POST http://127.0.0.1:8888/manage/delete -d "access=<access_token>" -d @delete_interview.json --header "Content-Type: application/json"
+$ curl -X POST http://127.0.0.1:8888/manage/delete -d "access=<access_token>" -d @candidate.json --header "Content-Type: application/json"
 ```
 
 ### Common Authorization Error Responses
