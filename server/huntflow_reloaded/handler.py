@@ -583,22 +583,16 @@ class ShowFwdHandler(ManageHandler):  # pylint: disable=abstract-method
         if not self.current_user:
             return
 
-        body = self.request.body.decode('utf8')
-
         try:
-            _decoded_body = json_decode(body)
-        except json.decoder.JSONDecodeError:
-            self.write('Could not decode request body. '
-                       'There must be valid JSON')
-            self.set_status(500)
-            return
-        try:
-            candidate = _decoded_body['candidate']
-            first_name = candidate['first_name']
-            last_name = candidate['last_name']
-        except KeyError:
-            self.write('Incomplete request')
-            self.set_status(500)
+            first_name = self.get_argument('first_name')
+            last_name = self.get_argument('last_name')
+        except MissingArgumentError as err:
+            data = {
+                'detail': 'Missing parameter "{}"'.format(err.arg_name),
+                'code': 'missing_parameter'
+            }
+            self.set_status(400)
+            self.write(data)
             return
 
         await self._connect_to_database()

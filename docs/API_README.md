@@ -157,13 +157,7 @@ $ curl -X GET http://127.0.0.1:8888/manage/fwd_list -d "access=<access_token>"
 |-------------------|--------|---------------|
 | `/manage/fwd`     | `GET`  | required      |
 
-Param: json data and `"access": [string]` where `access` is the access token.
-```
-"candidate" : {
-    "first_name": [string],
-    "last_name": [string]
-}
-```
+Param: query data with: `"access": [string]` where `access` is the access token, `"first_name": [string]` where `first_name` is the first name of candidate, `"last_name": [string]` where `last_name` is the last name of candidate.
 
 Success Response:
 * Code: 200
@@ -182,6 +176,7 @@ Specific Error Responses:
 * Content:
     - `{"detail": "Candidate with the given credentials was not found", "code": "no_candidate"}` 
     - `{"detail": "First working day of specified candidate was not found", "code"": "no_fwd"}` 
+    - `{"detail": "Missing parameter paramName", "code": "missing_parameter"}`
 ----
 
 * Code: 400
@@ -194,7 +189,7 @@ Specific Error Responses:
 Sample Call:
 
 ```bash
-$ curl -X GET http://127.0.0.1:8888/manage/fwd -d "access=<access_token>" -d @candidate.json --header "Content-Type: application/json"
+$ curl -X GET http://127.0.0.1:8888/manage/fwd -d "access=<access_token>" -d "first_name=<first_name>" -d "last_name=<last_name>"
 ```
 
 ### Interface for deleting a non-expired interview for the specified candidate

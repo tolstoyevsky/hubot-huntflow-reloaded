@@ -590,8 +590,9 @@ class ManageFwdHandlerTest(WebTestCase):
         self.assertEqual(response.code, 200)
         self.assertEqual(exp_list, json.loads(response.body))
 
-        body = stubs.CANDIDATE_REQUEST
-        url = '/manage/fwd/?access=' + self.access_token
+        body = json.loads(stubs.CANDIDATE_REQUEST)['candidate']
+        url = ('/manage/fwd/?first_name={}&last_name={}&access={}'
+                .format(body['first_name'], body['last_name'], self.access_token))
 
         exp_res = {
             "candidate" : {
@@ -601,7 +602,7 @@ class ManageFwdHandlerTest(WebTestCase):
             }
         }
 
-        response = self.fetch(url, body=body, method='GET', allow_nonstandard_methods=True)
+        response = self.fetch(url, method='GET', allow_nonstandard_methods=True)
         self.assertEqual(response.code, 200)
         self.assertEqual(json.loads(response.body), exp_res)
 
@@ -619,10 +620,11 @@ class ManageFwdHandlerTest(WebTestCase):
         self.access_token = json.loads((response.body)).get('access')
 
         # try to get fwd for invalid candidate
-        body = stubs.INVALID_CANDIDATE_REQUEST
-        url = '/manage/fwd/?access=' + self.access_token
+        body = json.loads(stubs.INVALID_CANDIDATE_REQUEST)['candidate']
+        url = ('/manage/fwd/?first_name={}&last_name={}&access={}'
+                .format(body['first_name'], body['last_name'], self.access_token))
 
-        response = self.fetch(url, body=body, method='GET',
+        response = self.fetch(url, method='GET',
                               allow_nonstandard_methods=True)
         exp_res = {
             'detail': 'Candidate with the given credentials was not found',
@@ -634,9 +636,10 @@ class ManageFwdHandlerTest(WebTestCase):
         # try to get fwd for candidate without relevant attribute
         self.send_status_request()
 
-        url = '/manage/fwd/?access=' + self.access_token
-        body = stubs.CANDIDATE_REQUEST
-        response = self.fetch(url, body=body, method='GET',
+        body = json.loads(stubs.CANDIDATE_REQUEST)['candidate']
+        url = ('/manage/fwd/?first_name={}&last_name={}&access={}'
+                .format(body['first_name'], body['last_name'], self.access_token))
+        response = self.fetch(url, method='GET',
                               allow_nonstandard_methods=True)
         exp_res = {
             'detail': 'First working day of specified candidate was not found',
