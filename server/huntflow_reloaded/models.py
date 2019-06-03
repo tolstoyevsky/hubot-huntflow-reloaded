@@ -25,6 +25,7 @@ class Candidate(DB.Model):
 
     first_name = DB.Column(DB.String())  # pylint: disable=maybe-no-member
     last_name = DB.Column(DB.String())  # pylint: disable=maybe-no-member
+    first_working_day = DB.Column(DB.Date()) # pylint: disable=maybe-no-member
 
     __table_args__ = (DB.UniqueConstraint('id'))  # pylint: disable=maybe-no-member
 

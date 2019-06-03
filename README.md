@@ -210,10 +210,30 @@ You can emulate the following actions:
     - sent request for deleting the interview of the specified candidate
     
     ```bash
-    curl -vX POST http://127.0.0.1:8888/manage/delete -d "access=<access_token>" -d @delete_interview.json --header "Content-Type: application/json"
+    curl -vX POST http://127.0.0.1:8888/manage/delete -d "access=<access_token>" -d @candidate.json --header "Content-Type: application/json"
     ```
     
     For the details check the API 
+    [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/blob/jwt-auth/docs/API_README.md)
+    and CLI [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/tree/master/cli/README.md).
+
+- retrieving the first working day of the specified candidate
+
+    The huntflow-reloaded-server saves the first working day of the candidates from the Huntflow web-hook to the database.
+    The client in its turn can request the first working day of the specified candidate.
+    To emulate the workflow you need to
+    - send the fwd request
+    - get the valid token pair
+    - get the list of the candidates who has first working day set
+    ```bash
+    curl http://127.0.0.1:8888/manage/fwd_list -d "access=<access_token>"
+    ```
+    - get the first working day for the specified candidate
+    ```bash
+    curl -X GET http://127.0.0.1:8888/manage/fwd -d "access=<access_token>" -d @candidate.json --header "Content-Type: application/json"
+
+    ```
+    For the details check the API
     [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/blob/jwt-auth/docs/API_README.md)
     and CLI [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/tree/master/cli/README.md).
 

@@ -94,6 +94,8 @@ def main():
         (r'/token/refresh', handler.TokenRefreshHandler),
         (r'/manage/list', handler.ListCandidatesHandler, {'postgres_url': postgres_url}),
         (r'/manage/delete', handler.DeleteInterviewHandler, app_args),
+        (r'/manage/fwd_list', handler.ListCandidatesWithFwdHandler, {'postgres_url': postgres_url}),
+        (r'/manage/fwd', handler.ShowFwdHandler, {'postgres_url': postgres_url})
     ])
     application.listen(options.port)
 
