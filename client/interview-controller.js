@@ -5,14 +5,17 @@
 //  begin group Huntflow Reloaded
 //    begin admin
 //      hubot удалить интервью - removes the non-expired interview of the specified candidate
+//      hubot когда выйдет - shows list with people who are coming to work soon
 //    end admin
 //  end group
 //
 
 const routines = require('hubot-routines')
+const moment = require('moment')
 const utils = require('./utils')
 
 const interviewsService = require('./interviews-service')
+const fwdService = require('./fwd-service')
 
 const deleteCandidateRegExp = new RegExp(/(удалить интервью кандидата)\s(((([А-Яа-я]+)|([A-Za-z]+))\s?){2})\s*/i)
 
@@ -58,6 +61,63 @@ module.exports = async (robot) => {
 
     return msg.send(message)
   })
+
+  robot.respond(/когда выйдет\s*$/i, async (msg) => {
+    if (!await routines.isAdmin(robot, msg.message.user.name)) {
+      msg.send(utils.MSG_PERMISSION_DENIED)
+      return
+    }
+
+    fwdService.getFWDList()
+      .then(response => {
+        if (response.data.total) {
+          const { users } = response.data
+          const buttons = routines.buildMessageWithButtons(
+            'Кто из этих замечательных людей?',
+            users.map(user => [
+              `${user.first_name} ${user.last_name}`,
+              `Когда выйдет ${user.first_name} ${user.last_name}`
+            ])
+          )
+          msg.send(buttons)
+        } else {
+          msg.send(utils.MSG_NOT_ANY_FWD_USER)
+        }
+      })
+      .catch(err => {
+        if (err.response && err.response.status === 400) {
+          msg.send(getServerTranslatedMessage(err.response.data.code))
+        } else {
+          msg.send(utils.MSG_ERROR_TRY_AGAIN)
+        }
+        routines.rave(robot, err.message)
+      })
+  })
+
+  robot.respond(/когда выйдет (([а-яa-z]+\s*)+)/i, async (msg) => {
+    if (!await routines.isAdmin(robot, msg.message.user.name)) {
+      msg.send(utils.MSG_PERMISSION_DENIED)
+      return
+    }
+
+    const [first_name, last_name] = msg.match[1].split(' ') // eslint-disable-line camelcase
+    const candidate = { first_name, last_name }
+
+    fwdService.getFWDUser(candidate)
+      .then(response => {
+        const { first_name, last_name, fwd } = response.data.candidate // eslint-disable-line camelcase
+        const date = moment(fwd, 'YYYY-MM-DD').format('DD.MM')
+        msg.send(`${first_name} ${last_name} выходит на работу ${date}.`) // eslint-disable-line camelcase
+      })
+      .catch(err => {
+        if (err.response && err.response.status === 400) {
+          msg.send(getServerTranslatedMessage(err.response.data.code))
+        } else {
+          msg.send(utils.MSG_ERROR_TRY_AGAIN)
+        }
+        routines.rave(robot, err.message)
+      })
+  })
 }
 
 function buildCandidatesButtons (users) {
@@ -73,5 +133,5 @@ function buildCandidatesButtons (users) {
 }
 
 function getServerTranslatedMessage (code) {
-  return utils.ERROR_MSGS_FROM_SERVER[code]
+  return utils.ERROR_MSGS_FROM_SERVER[code] || 'Неизвестная ошибка. Попробуйте еще раз'
 }
