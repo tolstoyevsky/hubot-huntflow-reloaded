@@ -214,7 +214,7 @@ You can emulate the following actions:
     ```
     
     For the details check the API 
-    [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/blob/jwt-auth/docs/API_README.md)
+    [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/blob/master/docs/API_README.md)
     and CLI [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/tree/master/cli/README.md).
 
 - retrieving the first working day of the specified candidate
@@ -234,7 +234,7 @@ You can emulate the following actions:
 
     ```
     For the details check the API
-    [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/blob/jwt-auth/docs/API_README.md)
+    [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/blob/master/docs/API_README.md)
     and CLI [README](https://github.com/tolstoyevsky/hubot-huntflow-reloaded/tree/master/cli/README.md).
 
 ### Known issues
