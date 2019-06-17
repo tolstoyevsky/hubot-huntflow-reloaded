@@ -93,20 +93,21 @@ def main():
     scheduler.make()
 
     app_args = {
-        'scheduler' : scheduler,
         'postgres_url': postgres_url,
         'logger': logger,
     }
 
+    app_args_with_scheduler = app_args.copy()
+    app_args_with_scheduler.update({'scheduler' : scheduler})
+
     application = tornado.web.Application([
-        (r'/hf/?', handler.HuntflowWebhookHandler, app_args),
-        (r'/token', handler.TokenObtainPairHandler, {'postgres_url': postgres_url}),
-        (r'/token/refresh', handler.TokenRefreshHandler),
-        (r'/manage/list', handler.ListCandidatesHandler, {'postgres_url': postgres_url}),
-        (r'/manage/delete', handler.DeleteInterviewHandler, {'scheduler' : scheduler,
-                                                             'postgres_url': postgres_url}),
-        (r'/manage/fwd_list', handler.ListCandidatesWithFwdHandler, {'postgres_url': postgres_url}),
-        (r'/manage/fwd', handler.ShowFwdHandler, {'postgres_url': postgres_url})
+        (r'/hf/?', handler.HuntflowWebhookHandler, app_args_with_scheduler),
+        (r'/token', handler.TokenObtainPairHandler, app_args),
+        (r'/token/refresh', handler.TokenRefreshHandler, {'logger': logger}),
+        (r'/manage/list', handler.ListCandidatesHandler, app_args),
+        (r'/manage/delete', handler.DeleteInterviewHandler, app_args_with_scheduler),
+        (r'/manage/fwd_list', handler.ListCandidatesWithFwdHandler, app_args),
+        (r'/manage/fwd', handler.ShowFwdHandler, app_args)
     ])
     application.listen(options.port)
 

@@ -183,8 +183,10 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         self._form_valid_basic_attrs()
 
         if self.event.get('calendar_event'):
+            self._logger.info('Handling interview request')
             await self.handle_calendar_event()
         elif self.event.get('employment_date'):
+            self._logger.info('Handling first working day request')
             await self.handle_employment_date()
         else:
             raise IncompleteRequest
@@ -207,9 +209,14 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
         message_type = 'interview'
         _id = self.basic_attrs['_id']
 
-        candidate = await models.Candidate.query.where(models.Candidate.id == _id).gino.all()
+        candidate = await models.Candidate.query.where(models.Candidate.id == _id).gino.first()
 
         if not candidate:
+            self._logger.info('Setting interview for {} {}'.format(
+                self.basic_attrs['first_name'],
+                self.basic_attrs['last_name']
+            ))
+
             await models.Candidate.create(
                 id=self.basic_attrs['_id'],
                 first_name=self.basic_attrs['first_name'],
@@ -222,6 +229,9 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
             .gino.first()
 
         if interview:
+            self._logger.info('Rescheduling interview for {} {}'.format(
+                candidate.last_name, candidate.last_name))
+
             message_type = 'rescheduled-interview'
 
             if interview.jobs:
@@ -321,10 +331,14 @@ class TokenObtainPairHandler(RequestHandler):  # pylint: disable=abstract-method
         self.user = None
         self.valid = False
 
-    def initialize(self, postgres_url):  # pylint: disable=arguments-differ
+
+    def initialize(self, postgres_url, logger):  # pylint: disable=arguments-differ
         self._postgres_url = postgres_url
+        self._logger = logger
 
     async def post(self):  # pylint: disable=arguments-differ
+        self._logger.info('Generating token pair')
+
         body = self.request.body.decode('utf8')
 
         try:
@@ -340,6 +354,8 @@ class TokenObtainPairHandler(RequestHandler):  # pylint: disable=abstract-method
             email = user['email']
             password = user['password']
         except KeyError:
+            self._logger.debug(body)
+
             self.write('Incomplete request')
             self.set_status(500)
             return
@@ -357,6 +373,8 @@ class TokenObtainPairHandler(RequestHandler):  # pylint: disable=abstract-method
                 'code': 'invalid_auth_creds'
             }
             self.set_status(400)
+
+        self._logger.debug(body)
 
         self.write(data)
 
@@ -376,7 +394,12 @@ class TokenObtainPairHandler(RequestHandler):  # pylint: disable=abstract-method
 class TokenRefreshHandler(RequestHandler):  # pylint: disable=abstract-method
     """Class implementing handler for refreshing tokens pair request."""
 
+    def initialize(self, logger):  # pylint: disable=arguments-differ
+        self._logger = logger
+
     async def post(self):  # pylint: disable=arguments-differ
+        self._logger.info('Refreshing token pair')
+
         try:
             refresh = RefreshToken(self.get_argument('refresh'))
             data = {'access': str(refresh.access_token())}
@@ -395,6 +418,10 @@ class TokenRefreshHandler(RequestHandler):  # pylint: disable=abstract-method
 
 class ManageHandler(RequestHandler):  # pylint: disable=abstract-method,
     """Class implementing common methods for handling /manage endpoint. """
+
+    def initialize(self, postgres_url, logger):  # pylint: disable=arguments-differ
+        self._postgres_url = postgres_url
+        self._logger = logger
 
     async def _connect_to_database(self):
         """Connecting to ORM. """
@@ -436,14 +463,19 @@ class DeleteInterviewHandler(ManageHandler):  # pylint: disable=abstract-method
         self.token = None
         self._decoded_body = {}
 
-    def initialize(self, postgres_url, scheduler):  # pylint: disable=arguments-differ
-        self._postgres_url = postgres_url
+    def initialize(self, postgres_url, scheduler, logger):  # pylint: disable=arguments-differ
+        super(DeleteInterviewHandler, self).initialize(postgres_url, logger)
         self._scheduler = scheduler
 
     async def post(self):  # pylint: disable=arguments-differ
+        self._logger.info('Handling "delete interview" request')
+
         if not self.current_user:
+            self._logger.info('Authorization failed')
             return
         body = self.request.body.decode('utf8')
+
+        self._logger.info(body)
 
         try:
             _decoded_body = json_decode(body)
@@ -503,11 +535,9 @@ class ListCandidatesHandler(ManageHandler):  # pylint: disable=abstract-method
     which have non-expired interview.
     """
 
-    def initialize(self, postgres_url):  # pylint: disable=arguments-differ
-        self._postgres_url = postgres_url
-
-
     async def get(self):  # pylint: disable=arguments-differ
+        self._logger.info('Handling "list candidate with interview" request')
+
         if not self.current_user:
             return
 
@@ -540,10 +570,9 @@ class ListCandidatesWithFwdHandler(ManageHandler):  # pylint: disable=abstract-m
     which have first working day attribute.
     """
 
-    def initialize(self, postgres_url):  # pylint: disable=arguments-differ
-        self._postgres_url = postgres_url
-
     async def get(self):  # pylint: disable=arguments-differ
+        self._logger.info('Handling "list candidates with fwd" request')
+
         if not self.current_user:
             return
 
@@ -575,10 +604,9 @@ class ShowFwdHandler(ManageHandler):  # pylint: disable=abstract-method
     first working day for the specified candidate.
     """
 
-    def initialize(self, postgres_url):  # pylint: disable=arguments-differ
-        self._postgres_url = postgres_url
-
     async def get(self):  # pylint: disable=arguments-differ
+        self._logger.info('Handling "get fwd for specified candidate" request')
+
         if not self.current_user:
             return
 

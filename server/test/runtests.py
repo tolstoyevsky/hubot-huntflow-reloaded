@@ -292,21 +292,18 @@ class ManageHandlerTest(WebTestCase):
 
         app_args = {
             'postgres_url': POSTGRES_URL,
-            'scheduler': self.test_scheduler,
             'logger': LOGGER
         }
 
-        db_args = {'postgres_url': POSTGRES_URL}
+        app_args_with_scheduler = app_args.copy()
+        app_args_with_scheduler.update({'scheduler': self.test_scheduler})
 
         return [
-            ('/hf', handler.HuntflowWebhookHandler, app_args),
-            (r'/token', handler.TokenObtainPairHandler, db_args),
-            (r'/token/refresh', handler.TokenRefreshHandler),
-            (r'/manage/list/', handler.ListCandidatesHandler, db_args),
-            (r'/manage/delete/', handler.DeleteInterviewHandler, {
-                'scheduler' : self.test_scheduler,
-                'postgres_url': POSTGRES_URL
-            }),
+            ('/hf', handler.HuntflowWebhookHandler, app_args_with_scheduler),
+            (r'/token', handler.TokenObtainPairHandler, app_args),
+            (r'/token/refresh', handler.TokenRefreshHandler, {'logger': LOGGER}),
+            (r'/manage/list/', handler.ListCandidatesHandler, app_args),
+            (r'/manage/delete/', handler.DeleteInterviewHandler, app_args_with_scheduler),
         ]
 
     def get_tokens(self):
@@ -529,18 +526,18 @@ class ManageFwdHandlerTest(WebTestCase):
 
         app_args = {
             'postgres_url': POSTGRES_URL,
-            'scheduler': self.test_scheduler,
             'logger': LOGGER
         }
 
-        db_args = {'postgres_url': POSTGRES_URL}
+        app_args_with_scheduler = app_args.copy()
+        app_args_with_scheduler.update({'scheduler': self.test_scheduler})
 
         return [
-            ('/hf', handler.HuntflowWebhookHandler, app_args),
-            (r'/token', handler.TokenObtainPairHandler, db_args),
-            (r'/token/refresh', handler.TokenRefreshHandler),
-            (r'/manage/fwd_list/', handler.ListCandidatesWithFwdHandler, db_args),
-            (r'/manage/fwd/', handler.ShowFwdHandler, db_args),
+            ('/hf', handler.HuntflowWebhookHandler, app_args_with_scheduler),
+            (r'/token', handler.TokenObtainPairHandler, app_args),
+            (r'/token/refresh', handler.TokenRefreshHandler, {'logger': LOGGER}),
+            (r'/manage/fwd_list/', handler.ListCandidatesWithFwdHandler, app_args),
+            (r'/manage/fwd/', handler.ShowFwdHandler, app_args),
         ]
 
     def get_tokens(self):
