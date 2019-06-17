@@ -16,7 +16,6 @@
 
 
 import json
-import logging
 import re
 from datetime import datetime
 
@@ -62,7 +61,6 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
                                                      **kwargs)
         self._decoded_body = {}
         self._handlers = {}
-        self._logger = logging.getLogger('tornado.application')
         self._req_type = None
         self.basic_attrs = {}
         self.event = {}
@@ -76,9 +74,10 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
                 val = self._get_attr_or_stub('{}_handler'.format(i.lower()))
                 self._handlers[key] = val
 
-    def initialize(self, postgres_url, scheduler):  # pylint: disable=arguments-differ
+    def initialize(self, postgres_url, scheduler, logger):  # pylint: disable=arguments-differ
         self._postgres_url = postgres_url
         self._scheduler = scheduler
+        self._logger = logger
 
     def _classify_request(self):
         try:

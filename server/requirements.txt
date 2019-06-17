@@ -2,6 +2,7 @@ alembic==1.0.7
 APScheduler==3.5.3
 fakeredis==0.16.*
 gino==0.8.1
+loguru==0.2.5
 psycopg2==2.7.7
 pyjwt==1.7.*
 python-dotenv==0.10.1

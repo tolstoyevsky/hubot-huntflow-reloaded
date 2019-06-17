@@ -14,6 +14,7 @@
 
 from datetime import date, timedelta, datetime
 import json
+import logging
 import pickle
 import time
 
@@ -38,6 +39,8 @@ ACCOUNT = """
 """
 
 CREATED_DATE = "1989-12-17T00:00:00+00:00"
+
+LOGGER = logging.getLogger('tornado.application')
 
 POSTGRES_URL = "postgresql://postgres:@localhost:5432/test"
 
@@ -122,6 +125,7 @@ class HuntflowWebhookHandlerTest(WebTestCase):
         app_args = {
             'scheduler': self.test_scheduler,
             'postgres_url': POSTGRES_URL,
+            'logger': LOGGER
         }
         return [
             ('/hf', handler.HuntflowWebhookHandler, app_args),
@@ -289,6 +293,7 @@ class ManageHandlerTest(WebTestCase):
         app_args = {
             'postgres_url': POSTGRES_URL,
             'scheduler': self.test_scheduler,
+            'logger': LOGGER
         }
 
         db_args = {'postgres_url': POSTGRES_URL}
@@ -298,7 +303,10 @@ class ManageHandlerTest(WebTestCase):
             (r'/token', handler.TokenObtainPairHandler, db_args),
             (r'/token/refresh', handler.TokenRefreshHandler),
             (r'/manage/list/', handler.ListCandidatesHandler, db_args),
-            (r'/manage/delete/', handler.DeleteInterviewHandler, app_args),
+            (r'/manage/delete/', handler.DeleteInterviewHandler, {
+                'scheduler' : self.test_scheduler,
+                'postgres_url': POSTGRES_URL
+            }),
         ]
 
     def get_tokens(self):
@@ -522,6 +530,7 @@ class ManageFwdHandlerTest(WebTestCase):
         app_args = {
             'postgres_url': POSTGRES_URL,
             'scheduler': self.test_scheduler,
+            'logger': LOGGER
         }
 
         db_args = {'postgres_url': POSTGRES_URL}

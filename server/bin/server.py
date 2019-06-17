@@ -22,6 +22,7 @@ import redis
 import tornado.ioloop
 from tornado.options import define, options
 from dotenv import load_dotenv
+from loguru import logger
 
 from huntflow_reloaded.scheduler import Scheduler
 from huntflow_reloaded import handler
@@ -29,6 +30,14 @@ from huntflow_reloaded import handler
 load_dotenv()
 
 LOGGER = logging.getLogger('tornado.application')
+
+class PropagateHandler(logging.Handler):
+    """Class propagated default logger. """
+
+    def emit(self, record):
+        LOGGER.handle(record)
+
+logger.add(PropagateHandler(), format="{message}", enqueue=True)
 
 
 define('channel-name',
@@ -86,6 +95,7 @@ def main():
     app_args = {
         'scheduler' : scheduler,
         'postgres_url': postgres_url,
+        'logger': logger,
     }
 
     application = tornado.web.Application([
@@ -93,7 +103,8 @@ def main():
         (r'/token', handler.TokenObtainPairHandler, {'postgres_url': postgres_url}),
         (r'/token/refresh', handler.TokenRefreshHandler),
         (r'/manage/list', handler.ListCandidatesHandler, {'postgres_url': postgres_url}),
-        (r'/manage/delete', handler.DeleteInterviewHandler, app_args),
+        (r'/manage/delete', handler.DeleteInterviewHandler, {'scheduler' : scheduler,
+                                                             'postgres_url': postgres_url}),
         (r'/manage/fwd_list', handler.ListCandidatesWithFwdHandler, {'postgres_url': postgres_url}),
         (r'/manage/fwd', handler.ShowFwdHandler, {'postgres_url': postgres_url})
     ])
