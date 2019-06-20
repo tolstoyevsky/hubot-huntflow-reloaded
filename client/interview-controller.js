@@ -54,6 +54,13 @@ module.exports = async (robot) => {
       const candidate = text.split(' ').splice(4) // get elements after word 'кандидата'
       await interviewsService.deleteCandidateInterview({ first_name: candidate[1], last_name: candidate[0] })
       message = utils.MSG_SUCCESSFULLY_DELETED
+      const roomName = msg.envelope.message.room
+      if (roomName !== utils.HUNTFLOW_REMINDER_CHANNEL) {
+        robot.messageRoom(
+          utils.HUNTFLOW_REMINDER_CHANNEL,
+          `Собеседование кандидата ${candidate[0]} ${candidate[1]} было удалено пользователем @${msg.message.user.name}`
+        )
+      }
     } catch (error) {
       if (error.response.status === 400) message = getServerTranslatedMessage(error.response.data.code)
       routines.rave(robot, error.message)

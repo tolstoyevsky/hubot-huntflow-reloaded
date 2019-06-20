@@ -8,6 +8,8 @@ exp.BASE_SERVER_URL = process.env.BASE_SERVER_URL || 'http://127.0.0.1:8888'
 exp.SERVER_USER_EMAIL = process.env.SERVER_USER_EMAIL
 exp.SERVER_USER_PASSWORD = process.env.SERVER_USER_PASSWORD
 
+exp.HUNTFLOW_REMINDER_CHANNEL = process.env.HUNTFLOW_REMINDER_CHANNEL || 'hr'
+
 // messages constants
 exp.MSG_PERMISSION_DENIED = 'У тебя недостаточно прав для этой команды :rolling_eyes:'
 exp.MSG_NOT_ANY_SCHEDULED_INTERVIEWS = 'Запланированных интервью нет.'
