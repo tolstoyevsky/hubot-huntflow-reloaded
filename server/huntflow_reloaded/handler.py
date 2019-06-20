@@ -44,7 +44,27 @@ class UnknownType(Exception):
     """
 
 
-class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method,too-many-instance-attributes
+class HuntflowBaseHandler(RequestHandler):  # pylint: disable=abstract-method,too-many-instance-attributes
+    """Class implementing a base huntflow webhook handler. """
+
+    GINO_CONNECTED = False
+
+    def initialize(self, postgres_url, scheduler):  # pylint: disable=arguments-differ
+        self._postgres_url = postgres_url
+        self._scheduler = scheduler
+
+    async def _connect_to_database(self):
+        """ Connecting to ORM if not connected already """
+        if not HuntflowBaseHandler.GINO_CONNECTED:
+            try:
+                await models.gino_run(self._postgres_url)
+            except:
+                raise ConnectionError('Could not connect to Postgresql')
+            else:
+                HuntflowBaseHandler.GINO_CONNECTED = True
+
+
+class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-method,too-many-instance-attributes
     """Class implementing a Huntflow Webhook handler. """
 
     ADD_TYPE = 1
@@ -76,9 +96,6 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
                 val = self._get_attr_or_stub('{}_handler'.format(i.lower()))
                 self._handlers[key] = val
 
-    def initialize(self, postgres_url, scheduler):  # pylint: disable=arguments-differ
-        self._postgres_url = postgres_url
-        self._scheduler = scheduler
 
     def _classify_request(self):
         try:
@@ -90,16 +107,6 @@ class HuntflowWebhookHandler(RequestHandler):  # pylint: disable=abstract-method
             self._req_type = HuntflowWebhookHandler.TYPES[req_type]
         except KeyError:
             raise UnknownType
-
-    async def _connect_to_database(self):
-        """ Connecting to ORM if not connected already """
-        if not HuntflowWebhookHandler.GINO_CONNECTED:
-            try:
-                await models.gino_run(self._postgres_url)
-            except:
-                raise ConnectionError('Could not connect to Postgresql')
-            else:
-                HuntflowWebhookHandler.GINO_CONNECTED = True
 
     def _get_attr_or_stub(self, attribute_name):
         try:
@@ -394,13 +401,8 @@ class TokenRefreshHandler(RequestHandler):  # pylint: disable=abstract-method
         self.write(data)
 
 
-class ManageHandler(RequestHandler):  # pylint: disable=abstract-method,
+class ManageHandler(HuntflowBaseHandler):  # pylint: disable=abstract-method,
     """Class implementing common methods for handling /manage endpoint. """
-
-    async def _connect_to_database(self):
-        """Connecting to ORM. """
-
-        await models.gino_run(self._postgres_url)  # pylint: disable=no-member
 
     def get_current_user(self):
         try:
@@ -437,9 +439,6 @@ class DeleteInterviewHandler(ManageHandler):  # pylint: disable=abstract-method
         self.token = None
         self._decoded_body = {}
 
-    def initialize(self, postgres_url, scheduler):  # pylint: disable=arguments-differ
-        self._postgres_url = postgres_url
-        self._scheduler = scheduler
 
     async def post(self):  # pylint: disable=arguments-differ
         if not self.current_user:
