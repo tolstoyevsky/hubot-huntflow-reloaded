@@ -37,7 +37,7 @@ module.exports = async (robot) => {
     try {
       const response = await interviewsService.getCandidatesList()
       const candidates = response.data.users
-      message = candidates.length === 0 ? utils.MSG_NOT_ANY_SCHEDULED_INTERVIEWS : buildCandidatesButtons(candidates)
+      message = candidates.length === 0 ? utils.MSG_NOT_ANY_SCHEDULED_INTERVIEWS : buildCandidatesButtons(candidates, msg.robot.alias)
     } catch (error) {
       if (error.response.status === 400) message = getServerTranslatedMessage(error.response.data.code)
       routines.rave(robot, error.message)
@@ -71,7 +71,7 @@ module.exports = async (robot) => {
             'Кто из этих замечательных людей?',
             users.map(user => [
               `${user.first_name} ${user.last_name}`,
-              `Когда выйдет ${user.first_name} ${user.last_name}`
+              `${msg.robot.alias} когда выйдет ${user.first_name} ${user.last_name}`
             ])
           )
           msg.send(buttons)
@@ -110,10 +110,10 @@ module.exports = async (robot) => {
   })
 }
 
-function buildCandidatesButtons (users) {
+function buildCandidatesButtons (users, robotName) {
   const usersArray = users.map(function (user) {
     const username = `${user.last_name} ${user.first_name}`
-    return [username, `Удалить интервью кандидата ${username}`]
+    return [username, `${robotName} удалить интервью кандидата ${username}`]
   })
 
   return routines.buildMessageWithButtons(
