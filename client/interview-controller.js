@@ -62,12 +62,7 @@ module.exports = async (robot) => {
     return msg.send(message)
   })
 
-  robot.respond(/когда выйдет\s*$/i, async (msg) => {
-    if (!await routines.isAdmin(robot, msg.message.user.name)) {
-      msg.send(utils.MSG_PERMISSION_DENIED)
-      return
-    }
-
+  robot.respond(/когда выйдет\s*$/i, (msg) => {
     fwdService.getFWDList()
       .then(response => {
         if (response.data.total) {
@@ -94,12 +89,7 @@ module.exports = async (robot) => {
       })
   })
 
-  robot.respond(/когда выйдет (([а-яa-z]+\s*)+)/i, async (msg) => {
-    if (!await routines.isAdmin(robot, msg.message.user.name)) {
-      msg.send(utils.MSG_PERMISSION_DENIED)
-      return
-    }
-
+  robot.respond(/когда выйдет (([а-яa-z]+\s*)+)/i, (msg) => {
     const [first_name, last_name] = msg.match[1].split(' ') // eslint-disable-line camelcase
     const candidate = { first_name, last_name }
 
