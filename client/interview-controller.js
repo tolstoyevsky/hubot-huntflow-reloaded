@@ -17,7 +17,7 @@ const utils = require('./utils')
 const interviewsService = require('./interviews-service')
 const fwdService = require('./fwd-service')
 
-const deleteCandidateRegExp = new RegExp(/(удалить интервью кандидата)\s(((([А-Яа-я]+)|([A-Za-z]+))\s?){2})\s*/i)
+const deleteCandidateRegExp = new RegExp(/(удалить интервью кандидата)\s(((([А-Яа-яЁё]+)|([A-Za-zЁё]+))\s?){2})\s*/i)
 
 module.exports = async (robot) => {
   // Checking if server user email & password was specified
@@ -89,7 +89,7 @@ module.exports = async (robot) => {
       })
   })
 
-  robot.respond(/когда выйдет (([а-яa-z]+\s*)+)/i, (msg) => {
+  robot.respond(/когда выйдет (([а-яёa-z]+\s*)+)/i, (msg) => {
     const [first_name, last_name] = msg.match[1].split(' ') // eslint-disable-line camelcase
     const candidate = { first_name, last_name }
 
