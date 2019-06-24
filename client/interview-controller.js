@@ -3,9 +3,9 @@
 //
 // Commands:
 //  begin group Huntflow Reloaded
+//    hubot когда выйдет - shows list with people who are coming to work soon
 //    begin admin
 //      hubot удалить интервью - removes the non-expired interview of the specified candidate
-//      hubot когда выйдет - shows list with people who are coming to work soon
 //    end admin
 //  end group
 //
