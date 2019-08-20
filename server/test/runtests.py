@@ -294,7 +294,7 @@ class HuntflowWebhookHandlerTest(WebTestCase):
         interview = self.conn.execute(to_be_executed).fetchall()
         self.assertEqual(len(interview), 1)
 
-        jobs_id = json.loads(interview[0].jobs)
+        jobs_id = interview[0].jobs
 
         # Mocking of expired jobs
         for job_id in jobs_id:

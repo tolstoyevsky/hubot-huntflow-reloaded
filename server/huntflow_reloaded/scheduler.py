@@ -86,7 +86,7 @@ class Scheduler:
             job = self.add(date=scheduled_date, func=self._notify_interview, args=args)
             jobs.append(job.id)
 
-        await interview.update(jobs=json.dumps(jobs)).apply()
+        await interview.update(jobs=jobs).apply()
 
     async def remove_candidate(self, context):
         """Removes the candidate in a day after first working day at midnight. """

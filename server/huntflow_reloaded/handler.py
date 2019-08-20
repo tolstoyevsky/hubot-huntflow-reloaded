@@ -233,7 +233,7 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
             message_type = 'rescheduled-interview'
 
             if interview.jobs:
-                jobs_to_be_deleted = json_decode(interview.jobs)
+                jobs_to_be_deleted = interview.jobs
 
                 for job_id in jobs_to_be_deleted:
                     self._scheduler.remove_job(job_id)
@@ -480,7 +480,7 @@ class DeleteInterviewHandler(ManageHandler):  # pylint: disable=abstract-method
 
         if interview and interview.start > datetime.now():
             if interview.jobs:
-                jobs_to_be_deleted = json_decode(interview.jobs)
+                jobs_to_be_deleted = interview.jobs
 
                 for job_id in jobs_to_be_deleted:
                     self._scheduler.remove_job(job_id)
