@@ -19,6 +19,7 @@ import json
 import re
 from datetime import datetime
 
+from aiologger import Logger
 from tornado.escape import json_decode
 from tornado.web import RequestHandler, MissingArgumentError
 
@@ -81,8 +82,9 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
                                                      **kwargs)
         self._decoded_body = {}
         self._handlers = {}
-        self._redis_conn = self._redis_conn or None
+        self._redis_conn = kwargs.get('redis_conn')
         self._req_type = None
+        self._logger = Logger.with_default_handlers(name='tornado.application')
         self.basic_attrs = {}
         self.event = {}
         self.event_type = ''
@@ -94,12 +96,6 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
                 key = getattr(self, i)
                 val = self._get_attr_or_stub('{}_handler'.format(i.lower()))
                 self._handlers[key] = val
-
-    def initialize(self, redis_conn, channel_name, postgres, logger):  # pylint: disable=arguments-differ
-        self._channel_name = channel_name
-        self._redis_conn = redis_conn
-        self._postgres_data = postgres
-        self._logger = logger
 
     def _classify_request(self):
         try:
@@ -147,27 +143,27 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
         try:
             self._classify_request()
         except UndefinedType:
-            await self._logger.emit(body)
+            await self._logger.debug(body)
             self.write('Undefined type')
             self.set_status(500)
             return
         except UnknownType:
-            await self._logger.emit(body)
+            await self._logger.debug(body)
             self.write('Unknown type')
             self.set_status(500)
             return
 
-        await self._logger.emit(self._decoded_body)
+        await self._logger.debug(self._decoded_body)
 
         try:
             await self._handlers[self._req_type]()
         except IncompleteRequest:
-            await self._logger.emit(body)
+            await self._logger.debug(body)
             self.write('Incomplete request')
             self.set_status(500)
             return
 
-        await self._logger.emit(body)
+        await self._logger.debug(body)
 
     #
     # Handlers
@@ -175,11 +171,11 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
 
     async def add_type_handler(self):
         """Invokes when a request of the 'ADD' type is received. """
-        await self._logger.emit("Handling 'add' request")
+        await self._logger.debug("Handling 'add' request")
 
     async def removed_type_handler(self):
         """Invokes when a request of the 'REMOVED' type is received. """
-        await self._logger.emit("Handling 'removed' request")
+        await self._logger.debug("Handling 'removed' request")
 
     async def status_type_handler(self):
         """Invokes when a request of the 'STATUS' type is received:
@@ -188,7 +184,7 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
         * setting the first working day.
         """
 
-        await self._logger.emit("Handling 'status' request")
+        await self._logger.debug("Handling 'status' request")
 
         self.event = self._decoded_body['event']
 
@@ -307,7 +303,7 @@ class HuntflowWebhookHandler(HuntflowBaseHandler):  # pylint: disable=abstract-m
         """Invokes when a type is registered but there is no handler defined
         which is responsible for dealing with the requests of the type.
         """
-        self._logger.emit('Invoking the stub handler to serve the request of '
+        await self._logger.debug('Invoking the stub handler to serve the request of '
                           'the type %s', self._req_type)
 
 
