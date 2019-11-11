@@ -22,14 +22,12 @@ import redis
 import tornado.ioloop
 from tornado.options import define, options
 from dotenv import load_dotenv
+from aiologger import Logger
 
 from huntflow_reloaded.scheduler import Scheduler
 from huntflow_reloaded import handler
 
 load_dotenv()
-
-LOGGER = logging.getLogger('tornado.application')
-
 
 define('channel-name',
        help='specify the channel name which is used for communicating with '
@@ -62,6 +60,8 @@ def main():
         sys.stderr.write('Could not connect to Redis\n')
         sys.exit(1)
 
+    logger = Logger.with_default_handlers(name='tornado.application')
+
     postgres_url = 'postgresql://{user}:{password}@{host}:{port}/{dbname}'.format(
         user=options.postgres_user,
         password=options.postgres_pass,
@@ -75,9 +75,9 @@ def main():
         'redis_args': {
             'host': options.redis_host,
             'password': options.redis_password,
-            'port': options.redis_port
+            'port': options.redis_port,
         },
-        'channel_name': options.channel_name,
+        'channel_name': options.channel_name
     }
 
     scheduler = Scheduler(**scheduler_args)
@@ -98,8 +98,6 @@ def main():
         (r'/manage/fwd', handler.ShowFwdHandler, {'postgres_url': postgres_url})
     ])
     application.listen(options.port)
-
-    LOGGER.info('server is listening on %s', options.port)
 
     try:
         tornado.ioloop.IOLoop.instance().start()

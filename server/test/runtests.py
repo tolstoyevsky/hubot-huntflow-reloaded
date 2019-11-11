@@ -23,6 +23,7 @@ import subprocess
 # Tests are running synchronously so we have to use sqlalchemy instead of gino.
 import sqlalchemy as sa
 import testing.postgresql
+from aiologger import Logger
 from tornado.ioloop import IOLoop
 from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application
